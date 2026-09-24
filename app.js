@@ -505,7 +505,7 @@ const TABLES = {
   dienstrapport: ["datum","dienst","route","medewerker","doel","gehaald","gemist","reden","opmerking","voorman","kantoor","actie","wie","status","gecontroleerd_door","gecontroleerd_op","afgerond_door","afgerond_op"],
   doelen: ["route","ochtend","middag","nacht"],
   scans: ["ts","shop","pin","note","op_date","dienst"],
-  mail_ontvangers: ["email","naam","dagrapport","onder_norm","aanspreekpunt","actief"],
+  mail_ontvangers: ["email","naam","dagrapport","onder_norm","aanspreekpunt","shiftrapport","actief"],
 };
 const KEYS = { mail_ontvangers:["email"], medewerkers:["naam"], evaluaties:["naam","moment"], routes:["naam","route"], vca:["naam"], toolboxen:["naam","toolbox"], dienstrapport:["datum","dienst","route"], doelen:["route"], scans:["ts","shop","pin"] };
 function clean(tab, row){ const o = {}; TABLES[tab].forEach(c => { if (row[c] !== undefined) o[c] = row[c] === "" ? null : (typeof row[c] === "number" ? String(row[c]) : row[c]); }); return o; }
@@ -850,12 +850,12 @@ SB.auth.getSession().then(({ data }) => { if (data.session) showApp(data.session
 function renderMail(){
   const g = document.getElementById("mail-grid"); if (!g) return;
   const rows = (DATA.mail_ontvangers||[]).filter(r => r.actief !== false);
-  g.innerHTML = `<span class="h">Naam</span><span class="h">E-mail</span><span class="h">Dagrapport</span><span class="h">Onder norm</span><span class="h">Aanspreekpunt</span><span class="h"></span>` + rows.map(r => `<span>${r.naam||""}</span><span class="sub">${r.email}</span><input type="checkbox" data-e="${r.email}" data-k="dagrapport" ${r.dagrapport?"checked":""}><input type="checkbox" data-e="${r.email}" data-k="onder_norm" ${r.onder_norm?"checked":""}><input type="checkbox" data-e="${r.email}" data-k="aanspreekpunt" ${r.aanspreekpunt?"checked":""}><button class="lnk mail-del" data-e="${r.email}">weg</button>`).join("");
+  g.innerHTML = `<span class="h">Naam</span><span class="h">E-mail</span><span class="h">Dagrapport</span><span class="h">Onder norm</span><span class="h">Aanspreekpunt</span><span class="h">Per dienst</span><span class="h"></span>` + rows.map(r => `<span>${r.naam||""}</span><span class="sub">${r.email}</span><input type="checkbox" data-e="${r.email}" data-k="dagrapport" ${r.dagrapport?"checked":""}><input type="checkbox" data-e="${r.email}" data-k="onder_norm" ${r.onder_norm?"checked":""}><input type="checkbox" data-e="${r.email}" data-k="aanspreekpunt" ${r.aanspreekpunt?"checked":""}><input type="checkbox" data-e="${r.email}" data-k="shiftrapport" ${r.shiftrapport?"checked":""}><button class="lnk mail-del" data-e="${r.email}">weg</button>`).join("");
   g.querySelectorAll("input[type=checkbox]").forEach(c => c.onchange = async () => { const r = rows.find(x => x.email === c.dataset.e); r[c.dataset.k] = c.checked; const { error } = await SB.from("mail_ontvangers").upsert(r, { onConflict: "email" }); toast(error ? "Opslaan mislukt: " + error.message : "Mailvoorkeur opgeslagen"); });
   g.querySelectorAll(".mail-del").forEach(b => b.onclick = async () => { if (!confirm(`${b.dataset.e} verwijderen als ontvanger?`)) return; const { error } = await SB.from("mail_ontvangers").delete().eq("email", b.dataset.e); if (error) return toast("Mislukt: " + error.message); DATA.mail_ontvangers = DATA.mail_ontvangers.filter(x => x.email !== b.dataset.e); renderMail(); });
 }
 document.getElementById("mail-add").onclick = async () => {
-  const r = { email: v("mail-email").toLowerCase(), naam: v("mail-naam"), dagrapport: document.getElementById("mail-dag").checked, onder_norm: document.getElementById("mail-norm").checked, aanspreekpunt: document.getElementById("mail-actie").checked, actief: true };
+  const r = { email: v("mail-email").toLowerCase(), naam: v("mail-naam"), dagrapport: document.getElementById("mail-dag").checked, onder_norm: document.getElementById("mail-norm").checked, aanspreekpunt: document.getElementById("mail-actie").checked, shiftrapport: document.getElementById("mail-shift").checked, actief: true };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email)) return toast("Vul een geldig e-mailadres in.");
   const { error } = await SB.from("mail_ontvangers").upsert(r, { onConflict: "email" }); if (error) return toast("Mislukt: " + error.message);
   upsertLocal(DATA.mail_ontvangers = DATA.mail_ontvangers||[], r, ["email"]); ["mail-email","mail-naam"].forEach(id => document.getElementById(id).value = ""); renderMail(); toast(`${r.email} toegevoegd`);
