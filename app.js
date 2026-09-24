@@ -705,15 +705,27 @@ const SHIFT_KEY = { "Ochtend":"ochtend", "Middag":"middag", "Nacht":"nacht" };
 function routeNameFor(pin, shift){ const n = CONFIG.routePins[pin]; if (!n) return null; if (pin === "5558") return shift === "nacht" ? "Nacht" : null; return shift === "ochtend" ? n + " dag" : shift === "middag" ? n + " avond" : null; }
 function pinFor(routeName){ for (const pin in CONFIG.routePins) { const n = CONFIG.routePins[pin]; if (routeName === "Nacht" && pin === "5558") return pin; if (routeName === n + " dag" || routeName === n + " avond") return pin; } return null; }
 function scansFor(date, shiftKey){ return (DATA.scans||[]).filter(s => s.op_date === date && (!shiftKey || s.dienst === shiftKey)); }
+function rondeOf(ts){
+  const m = ts.getHours()*60 + ts.getMinutes();
+  for (const r of RONDEN) { if (r.id === 7 && (m >= 22*60+45 || m < r.end)) return r.id; if (m >= r.start && m < r.end) return r.id; }
+  let best = null, bd = 99; for (const r of RONDEN) { const dd = Math.min(Math.abs(m - r.start), Math.abs(m - r.end)); if (dd < bd) { bd = dd; best = r.id; } }
+  return bd <= 20 ? best : null;   // scan net buiten het venster telt voor de dichtstbijzijnde ronde (max 20 min)
+}
+// Per winkel moeten meerdere rondes worden gelopen (w.r = ronde-nummers). Elk bezoek telt apart.
 function scanStats(date, dienst, routeName){
   const pin = pinFor(routeName); if (!pin || !date) return null;
   const shiftKey = SHIFT_KEY[dienst] || (routeName.endsWith("avond") ? "middag" : routeName === "Nacht" ? "nacht" : "ochtend");
   const def = getRouteDef(pin, shiftKey); if (!def || !def.winkels) return null;
   const sc = scansFor(date, shiftKey).filter(s => s.pin === pin);
   if (!sc.length && !scansFor(date, null).length) return null;
-  const missed = [], done = [];
-  def.winkels.forEach(w => { const hit = sc.some(s => matches(s.shop, w.n) && !isLiftScan(s.shop)); (hit ? done : missed).push(w.n); });
-  return { pin, expected: def.winkels.length, done: done.length, missed, doneList: done, scans: sc.length };
+  let expected = 0, done = 0; const missed = [], doneList = [];
+  def.winkels.forEach(w => {
+    const rondes = (w.r && w.r.length) ? [...new Set(w.r)] : [null];
+    const gemist = [];
+    rondes.forEach(rid => { expected++; const hit = sc.some(s => matches(s.shop, w.n) && !isLiftScan(s.shop) && (rid === null || rondeOf(s.ts) === rid)); if (hit) done++; else gemist.push(rid); });
+    if (gemist.length) missed.push(w.n + (gemist[0] === null ? "" : " (ronde " + gemist.join(", ") + ")")); else doneList.push(w.n);
+  });
+  return { pin, expected, done, missed, doneList, scans: sc.length, winkels: def.winkels.length, winkelsMissed: missed.length };
 }
 function renderScans(){
   const dates = [...new Set((DATA.scans||[]).map(s=>s.op_date))].sort();
@@ -729,12 +741,12 @@ function renderScans(){
     rows.push({ pin, sk, rn, ...st, dr: (DATA.dienstrapport||[]).find(r => r.datum===date && r.dienst===SHIFT_NL[sk] && r.route===rn) });
   }
   const exp = rows.reduce((a,r)=>a+r.expected,0), done = rows.reduce((a,r)=>a+r.done,0);
-  const k = [["Winkels gescand", exp?Math.round(done/exp*100)+"%":"–", exp?({ok:"green",warn:"amber",bad:"red"})[pctClass(Math.round(done/exp*100))]:""], ["Gescand / verwacht", `${done} / ${exp}`, ""], ["Niet gescand", exp-done, exp-done?"red":""], ["Routes onder norm", rows.filter(r=>r.expected&&r.done/r.expected*100<CONFIG.scanTarget).length, ""], ["Scans deze dag", scansFor(date,null).length, ""]];
-  document.getElementById("scan-kpis").innerHTML = k.map(([l,v,c]) => `<div class="kpi ${c}"><b>${v}</b><span>${l}</span></div>`).join("");
+  const k = [["Bezoeken gescand", exp?Math.round(done/exp*100)+"%":"–", exp?({ok:"green",warn:"amber",bad:"red"})[pctClass(Math.round(done/exp*100))]:""], ["Bezoeken gescand / verwacht", `${done} / ${exp}`, "per winkel per ronde"], ["Bezoeken gemist", exp-done, exp-done?"red":""], ["Routes onder norm", rows.filter(r=>r.expected&&r.done/r.expected*100<CONFIG.scanTarget).length, ""], ["Scans deze dag", scansFor(date,null).length, ""]];
+  document.getElementById("scan-kpis").innerHTML = k.map(([l,v,c]) => `<div class="kpi ${c==="per winkel per ronde"?"":c}"><b>${v}</b><span>${l}${c==="per winkel per ronde"?" <span class=sub>(per winkel per ronde)</span>":""}</span></div>`).join("");
   document.getElementById("scan-body").innerHTML = rows.length ? rows.map(r => { const p = r.expected?Math.round(r.done/r.expected*100):0; return `
-    <div class="scan-route"><div class="hd"><span class="dienst ${r.sk}">${SHIFT_NL[r.sk]}</span><h3>${r.rn}</h3><span class="prog"><span class="track"><span class="fill" style="width:${p}%;background:${p>=CONFIG.scanTarget?"var(--green)":p>=CONFIG.scanTarget-10?"var(--amber)":"var(--red)"}"></span></span><span class="num">${r.done}/${r.expected}</span></span><span class="pct ${pctClass(p)}">${p}%</span>
+    <div class="scan-route"><div class="hd"><span class="dienst ${r.sk}">${SHIFT_NL[r.sk]}</span><h3>${r.rn}</h3><span class="prog"><span class="track"><span class="fill" style="width:${p}%;background:${p>=CONFIG.scanTarget?"var(--green)":p>=CONFIG.scanTarget-10?"var(--amber)":"var(--red)"}"></span></span><span class="num">${r.done}/${r.expected} bezoeken</span></span><span class="pct ${pctClass(p)}">${p}%</span>
       <span class="spacer"></span>${r.dr ? `<span class="st ${r.dr.status==="Te bevestigen"?"amber":"green"}"><i></i>Dienstrapport: ${r.dr.status||"ingevuld"}${r.dr.medewerker?" · "+r.dr.medewerker:""}</span>` : `<span class="st grey"><i></i>Nog geen dienstrapport</span>`}</div>
-      ${r.missed.length ? `<details><summary>${r.missed.length} winkels niet gescand</summary><div class="shops">${r.missed.map(m=>`<span class="shop">${m}</span>`).join("")}</div></details>` : `<div class="sub" style="margin-top:6px">Alle winkels gescand.</div>`}
+      ${r.missed.length ? `<details open><summary>${r.expected-r.done} bezoeken gemist bij ${r.missed.length} winkels</summary><div class="shops">${r.missed.map(m=>`<span class="shop">${m}</span>`).join("")}</div></details>` : `<div class="sub" style="margin-top:6px">Alle winkels gescand.</div>`}
     </div>`; }).join("") : `<div class="empty">Geen scans voor ${fmt(date)}. Kies een andere datum of lees een export in.</div>`;
 }
 document.getElementById("scan-date").onchange = renderScans;
