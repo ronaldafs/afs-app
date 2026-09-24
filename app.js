@@ -308,12 +308,12 @@ function renderDs(){
   document.getElementById("ds-empty").style.display = rows.length?"none":"block";
   document.getElementById("ds-rows").innerHTML = rows.map(r=>`<tr style="cursor:default">
     <td class="num">${fmt(r.datum)}</td><td><span class="dienst ${(r.dienst||"").toLowerCase()}">${r.dienst||"–"}</span></td><td>${r.route||""}</td><td class="name">${r.medewerker||""}</td>
-    <td class="num">${r.doel||""}</td><td class="num">${r.gehaald}</td><td>${r.pct===null?"–":`<span class="pct ${pctClass(r.pct)}">${r.pct}%</span>`}${(() => { const st = scanStats(r.datum, r.dienst, r.route); return st && (st.done !== r.gehaald || st.expected !== r.doel) ? `<div><span class="st amber" style="padding:1px 7px;font-size:11px" title="De scans zijn veranderd sinds dit rapport is gemaakt"><i></i>scans nu ${st.done}/${st.expected}</span> <button class="lnk ds-sync" data-k="${dsKey(r)}">bijwerken</button></div>` : ""; })()}</td>
+    <td class="num">${r.doel||""}</td><td class="num">${r.gehaald}${r.laatste_scan?`<span class="sub">${r.eerste_scan||"?"} – ${r.laatste_scan}</span>`:""}</td><td>${r.pct===null?"–":`<span class="pct ${pctClass(r.pct)}">${r.pct}%</span>`}${(() => { const st = scanStats(r.datum, r.dienst, r.route); return st && (st.done !== r.gehaald || st.expected !== r.doel) ? `<div><span class="st amber" style="padding:1px 7px;font-size:11px" title="De scans zijn veranderd sinds dit rapport is gemaakt"><i></i>scans nu ${st.done}/${st.expected}</span> <button class="lnk ds-sync" data-k="${dsKey(r)}">bijwerken</button></div>` : ""; })()}</td>
     <td style="white-space:normal;max-width:240px">${r.status==="Te bevestigen"?`<span class="st amber"><i></i>Te bevestigen</span> `:""}${r.reden||""}${r.gemist?`<details><summary style="font-size:12px;color:var(--blue);cursor:pointer">Niet gescand (${r.gemist.split("|").length})</summary><div class="shops">${r.gemist.split("|").map(g=>`<span class="shop">${g}</span>`).join("")}</div></details>`:""}</td><td style="white-space:normal;max-width:220px;color:var(--muted);font-size:12.5px">${r.opmerking||""}</td><td>${r.voorman||""}${r.status==="Te bevestigen"?` <button class="lnk ds-confirm" data-k="${dsKey(r)}">bevestigen</button>`:""}</td>
     <td style="white-space:normal;max-width:240px;font-size:12.5px">${kcCell(r)}</td></tr>`).join("");
   document.querySelectorAll("#ds-rows .kc-open").forEach(b => b.onclick = e => { e.stopPropagation(); openKc(b.dataset.k); });
   document.querySelectorAll("#ds-rows .ds-confirm").forEach(b => b.onclick = e => { e.stopPropagation(); openDsEdit(b.dataset.k); });
-  document.querySelectorAll("#ds-rows .ds-sync").forEach(b => b.onclick = async e => { e.stopPropagation(); const r = (DATA.dienstrapport||[]).find(x => dsKey(x) === b.dataset.k); const st = scanStats(r.datum, r.dienst, r.route); if (!st) return; await save("dienstrapport", KEYS.dienstrapport, {...r, doel:String(st.expected), gehaald:String(st.done), gemist: st.missed.join("|")}, `${r.route}: bijgewerkt naar ${st.done}/${st.expected}`); renderDs(); });
+  document.querySelectorAll("#ds-rows .ds-sync").forEach(b => b.onclick = async e => { e.stopPropagation(); const r = (DATA.dienstrapport||[]).find(x => dsKey(x) === b.dataset.k); const st = scanStats(r.datum, r.dienst, r.route); if (!st) return; await save("dienstrapport", KEYS.dienstrapport, {...r, doel:String(st.expected), gehaald:String(st.done), gemist: st.missed.join("|"), eerste_scan: st.firstStr, laatste_scan: st.lastStr}, `${r.route}: bijgewerkt naar ${st.done}/${st.expected}`); renderDs(); });
   document.querySelectorAll("#ds-rows .kc-done").forEach(b => b.onclick = e => { e.stopPropagation(); markDone(b.dataset.k); });
 }
 const dsKey = r => [r.datum, r.dienst, r.route].join("|");
@@ -357,7 +357,7 @@ document.getElementById("dsBtn").onclick = () => {
   const fill = () => {
     const st = scanStats(document.getElementById("s-datum").value, document.getElementById("s-dienst").value, rs.value);
     document.getElementById("s-doel").value = st ? st.expected : doelVoor(rs.value, document.getElementById("s-dienst").value);
-    if (st) { document.getElementById("s-gehaald").value = st.done; document.getElementById("s-scaninfo").innerHTML = `Uit EcoSmart: ${st.done}/${st.expected} winkels gescand.` + (st.missed.length ? `<div class="shops">${st.missed.map(g=>`<span class="shop">${g}</span>`).join("")}</div>` : ""); }
+    if (st) { document.getElementById("s-gehaald").value = st.done; document.getElementById("s-scaninfo").innerHTML = `Uit EcoSmart: ${st.done}/${st.expected} bezoeken gescand${st.lastStr?`, eerste scan ${st.firstStr}, laatste scan ${st.lastStr}`:""}.` + (st.missed.length ? `<div class="shops">${st.missed.map(g=>`<span class="shop">${g}</span>`).join("")}</div>` : ""); }
     else document.getElementById("s-scaninfo").innerHTML = "Geen scans ingelezen voor deze dag/route. Vul de aantallen zelf in.";
   };
   document.getElementById("s-datum").onchange = fill;
@@ -503,7 +503,7 @@ const TABLES = {
   vca: ["naam","status","datum","diploma"],
   toolboxen: ["naam","toolbox","deadline","afgerond"],
   incidenten: ["datum","dienst","naam","incident","tijd","waarschuwing","voorman","opmerking"],
-  dienstrapport: ["datum","dienst","route","medewerker","doel","gehaald","gemist","reden","opmerking","voorman","kantoor","actie","wie","status","gecontroleerd_door","gecontroleerd_op","afgerond_door","afgerond_op"],
+  dienstrapport: ["datum","dienst","route","medewerker","doel","gehaald","gemist","eerste_scan","laatste_scan","reden","opmerking","voorman","kantoor","actie","wie","status","gecontroleerd_door","gecontroleerd_op","afgerond_door","afgerond_op"],
   doelen: ["route","ochtend","middag","nacht"],
   scans: ["ts","shop","pin","note","op_date","dienst"],
   mail_ontvangers: ["email","naam","dagrapport","onder_norm","aanspreekpunt","shiftrapport","actief"],
@@ -627,7 +627,7 @@ document.getElementById("m-save").onclick = async () => {
       toast(res.demo ? `${m.naam} toegevoegd (demo: niet opgeslagen, geen sheet gekoppeld)` : `${m.naam} toegevoegd aan de sheet`);
     } else if (mode === "ds") {
       const row = {...(dsEditRow||{}), datum:v("s-datum"), dienst:v("s-dienst"), route:v("s-route"), medewerker:v("s-naam"), doel:v("s-doel"), gehaald:v("s-gehaald"), reden:v("s-reden"), opmerking:v("s-opm"), voorman:v("s-voorman")||who(), status: (dsEditRow && dsEditRow.status==="Te bevestigen") ? "Bevestigd" : (dsEditRow ? dsEditRow.status : "Bevestigd")};
-      const st = scanStats(row.datum, row.dienst, row.route); if (st && !row.gemist) row.gemist = st.missed.join("|");
+      const st = scanStats(row.datum, row.dienst, row.route); if (st) { if (!row.gemist) row.gemist = st.missed.join("|"); row.eerste_scan = st.firstStr; row.laatste_scan = st.lastStr; }
       if (!row.datum || !row.route || row.gehaald==="") return toast("Datum, route en aantal gehaald zijn verplicht.");
       if (+row.doel && +row.gehaald < +row.doel && !row.reden) return toast("Geef een reden op waarom het doel niet is gehaald.");
       closeModal();
@@ -735,7 +735,9 @@ function scanStats(date, dienst, routeName){
     rondes.forEach(rid => { expected++; const hit = sc.some(s => matches(s.shop, w.n) && !isLiftScan(s.shop) && (rid === null || rondeOf(s.ts) === rid)); if (hit) done++; else gemist.push(rid); });
     if (gemist.length) missed.push(w.n + (gemist[0] === null ? "" : " (ronde " + gemist.join(", ") + ")")); else doneList.push(w.n);
   });
-  return { pin, expected, done, missed, doneList, scans: sc.length, winkels: def.winkels.length, winkelsMissed: missed.length };
+  const times = sc.map(s => s.ts).sort((x,y)=>x-y);
+  const hhmm = t => t ? t.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"}) : "";
+  return { pin, expected, done, missed, doneList, scans: sc.length, winkels: def.winkels.length, winkelsMissed: missed.length, first: times[0]||null, last: times[times.length-1]||null, firstStr: hhmm(times[0]), lastStr: hhmm(times[times.length-1]) };
 }
 function renderScans(){
   const dates = [...new Set((DATA.scans||[]).map(s=>s.op_date))].sort();
@@ -754,7 +756,7 @@ function renderScans(){
   const k = [["Bezoeken gescand", exp?Math.round(done/exp*100)+"%":"–", exp?({ok:"green",warn:"amber",bad:"red"})[pctClass(Math.round(done/exp*100))]:""], ["Bezoeken gescand / verwacht", `${done} / ${exp}`, "per winkel per ronde"], ["Bezoeken gemist", exp-done, exp-done?"red":""], ["Routes onder norm", rows.filter(r=>r.expected&&r.done/r.expected*100<CONFIG.scanTarget).length, ""], ["Scans deze dag", scansFor(date,null).length, ""]];
   document.getElementById("scan-kpis").innerHTML = k.map(([l,v,c]) => `<div class="kpi ${c==="per winkel per ronde"?"":c}"><b>${v}</b><span>${l}${c==="per winkel per ronde"?" <span class=sub>(per winkel per ronde)</span>":""}</span></div>`).join("");
   document.getElementById("scan-body").innerHTML = rows.length ? rows.map(r => { const p = r.expected?Math.round(r.done/r.expected*100):0; return `
-    <div class="scan-route"><div class="hd"><span class="dienst ${r.sk}">${SHIFT_NL[r.sk]}</span><h3>${r.rn}</h3><span class="prog"><span class="track"><span class="fill" style="width:${p}%;background:${p>=CONFIG.scanTarget?"var(--green)":p>=CONFIG.scanTarget-10?"var(--amber)":"var(--red)"}"></span></span><span class="num">${r.done}/${r.expected} bezoeken</span></span><span class="pct ${pctClass(p)}">${p}%</span>
+    <div class="scan-route"><div class="hd"><span class="dienst ${r.sk}">${SHIFT_NL[r.sk]}</span><h3>${r.rn}</h3><span class="prog"><span class="track"><span class="fill" style="width:${p}%;background:${p>=CONFIG.scanTarget?"var(--green)":p>=CONFIG.scanTarget-10?"var(--amber)":"var(--red)"}"></span></span><span class="num">${r.done}/${r.expected} bezoeken</span></span><span class="pct ${pctClass(p)}">${p}%</span>${r.lastStr?`<span class="sub">eerste scan ${r.firstStr} \u00b7 laatste scan ${r.lastStr}</span>`:""}
       <span class="spacer"></span>${r.dr ? `<span class="st ${r.dr.status==="Te bevestigen"?"amber":"green"}"><i></i>Dienstrapport: ${r.dr.status||"ingevuld"}${r.dr.medewerker?" · "+r.dr.medewerker:""}</span>` : `<span class="st grey"><i></i>Nog geen dienstrapport</span>`}</div>
       ${r.missed.length ? `<details open><summary>${r.expected-r.done} bezoeken gemist bij ${r.missed.length} winkels</summary><div class="shops">${r.missed.map(m=>`<span class="shop">${m}</span>`).join("")}</div></details>` : `<div class="sub" style="margin-top:6px">Alle winkels gescand.</div>`}
     </div>`; }).join("") : `<div class="empty">Geen scans voor ${fmt(date)}. Kies een andere datum of lees een export in.</div>`;
@@ -778,7 +780,7 @@ document.getElementById("scan-file").onchange = async e => {
     await load();
     // bestaande dienstrapporten van deze dagen bijwerken met de nieuwe scancijfers (voorman-invoer blijft staan)
     let upd = 0;
-    for (const r of (DATA.dienstrapport||[]).filter(x => dates.includes(x.datum))) { const st = scanStats(r.datum, r.dienst, r.route); if (st && (String(st.expected) !== String(r.doel) || String(st.done) !== String(r.gehaald))) { const row = {...r, doel:String(st.expected), gehaald:String(st.done), gemist: st.missed.join("|")}; const res = await post("upsert", {tab:"dienstrapport", keys: KEYS.dienstrapport, row}); if (!res.error) { upsertLocal(DATA.dienstrapport, row, KEYS.dienstrapport); upd++; } } }
+    for (const r of (DATA.dienstrapport||[]).filter(x => dates.includes(x.datum))) { const st = scanStats(r.datum, r.dienst, r.route); if (st && (String(st.expected) !== String(r.doel) || String(st.done) !== String(r.gehaald))) { const row = {...r, doel:String(st.expected), gehaald:String(st.done), gemist: st.missed.join("|"), eerste_scan: st.firstStr, laatste_scan: st.lastStr}; const res = await post("upsert", {tab:"dienstrapport", keys: KEYS.dienstrapport, row}); if (!res.error) { upsertLocal(DATA.dienstrapport, row, KEYS.dienstrapport); upd++; } } }
     if (upd) toast(`${upd} dienstrapporten bijgewerkt met de nieuwe scans`);
     DAY = dates[dates.length-1]; renderScans();
   } catch (err) { st.textContent = "Inlezen mislukt: " + (err.message||err); }
@@ -792,7 +794,7 @@ document.getElementById("scan-gen").onclick = async () => {
     const st = scanStats(date, SHIFT_NL[sk], rn); if (!st) continue;
     const existing = (DATA.dienstrapport||{}) && (DATA.dienstrapport||[]).find(r => r.datum===date && r.dienst===SHIFT_NL[sk] && r.route===rn);
     if (existing && String(existing.doel)===String(st.expected) && String(existing.gehaald)===String(st.done) && (existing.gemist||"")===st.missed.join("|")) { skipped++; continue; }
-    const row = { ...(existing||{}), datum: date, dienst: SHIFT_NL[sk], route: rn, doel: String(st.expected), gehaald: String(st.done), gemist: st.missed.join("|"), status: existing && existing.status && existing.status !== "Te bevestigen" ? existing.status : "Te bevestigen", voorman: existing ? existing.voorman : "" };
+    const row = { ...(existing||{}), datum: date, dienst: SHIFT_NL[sk], route: rn, doel: String(st.expected), gehaald: String(st.done), gemist: st.missed.join("|"), eerste_scan: st.firstStr, laatste_scan: st.lastStr, status: existing && existing.status && existing.status !== "Te bevestigen" ? existing.status : "Te bevestigen", voorman: existing ? existing.voorman : "" };
     const res = await post("upsert", { tab: "dienstrapport", keys: KEYS.dienstrapport, row }); if (res.error) { toast("Mislukt: " + res.error); return; }
     upsertLocal(DATA.dienstrapport = DATA.dienstrapport||[], row, KEYS.dienstrapport); n++;
   }
@@ -824,7 +826,7 @@ function renderHome(){
       <div class="home-card" onclick="setView('inc')"><h3>Incidenten deze dag</h3><b style="color:${incDag.length?"var(--amber)":"var(--ink)"}">${incDag.length}</b><div class="sub">${incDag.length?incDag.map(i=>i.naam+" · "+i.incident).slice(0,2).join(" · "):"geen incidenten"} · 30 dagen: ${inc30.length}</div></div>
       <div class="home-card" onclick="setView('inc')"><h3>Signalering herhalers</h3><b style="color:${alerts.length?"var(--red)":"var(--ink)"}">${alerts.length}</b><div class="sub">${alerts.length?alerts.slice(0,3).map(a=>a.naam).join(" · "):"niemand valt op"}</div></div>
     </div>
-    ${dag.length ? `<div class="home-list"><h3 style="font-size:13px;margin:12px 0 4px">Scans per route \u00b7 ${fmt(DAY)}</h3>${dag.sort((x,y)=>(x.dienst+x.route).localeCompare(y.dienst+y.route)).map(r=>`<div class="tb"><span><span class="dienst ${(r.dienst||"").toLowerCase()}">${r.dienst}</span> <b>${r.route}</b> <span class="sub">${r.medewerker||"–"}${r.reden?" · "+r.reden:""}</span></span><span style="display:flex;gap:8px;align-items:center"><span class="num sub">${r.gehaald}/${r.doel}</span>${r.pct===null?"":`<span class="pct ${pctClass(r.pct)}">${r.pct}%</span>`}${r.status==="Te bevestigen"?`<span class="st amber"><i></i>te bevestigen</span>`:""}</span></div>`).join("")}</div>` : ""}
+    ${dag.length ? `<div class="home-list"><h3 style="font-size:13px;margin:12px 0 4px">Scans per route \u00b7 ${fmt(DAY)}</h3>${dag.sort((x,y)=>(x.dienst+x.route).localeCompare(y.dienst+y.route)).map(r=>`<div class="tb"><span><span class="dienst ${(r.dienst||"").toLowerCase()}">${r.dienst}</span> <b>${r.route}</b> <span class="sub">${r.medewerker||"–"}${r.reden?" · "+r.reden:""}</span></span><span style="display:flex;gap:8px;align-items:center">${r.laatste_scan?`<span class="sub">laatste scan ${r.laatste_scan}</span>`:""}<span class="num sub">${r.gehaald}/${r.doel}</span>${r.pct===null?"":`<span class="pct ${pctClass(r.pct)}">${r.pct}%</span>`}${r.status==="Te bevestigen"?`<span class="st amber"><i></i>te bevestigen</span>`:""}</span></div>`).join("")}</div>` : ""}
     ${oa.length ? `<div class="home-list"><h3 style="font-size:13px;margin:12px 0 4px">Aanspreekpunten vanuit kantoor</h3>${oa.slice(0,6).map(r=>`<div class="tb"><span><b>${r.medewerker||"–"}</b> · ${r.route} · ${fmt(r.datum)}<span class="sub">${r.kantoor||""}</span></span><span class="act" style="color:var(--red);font-weight:500">${r.actie}${r.wie?" ("+r.wie+")":""}</span></div>`).join("")}</div>` : ""}
     ${alerts.length ? `<div class="home-list"><h3 style="font-size:13px;margin:12px 0 4px">Signalering incidenten</h3>${alerts.slice(0,6).map(a=>`<div class="tb"><span><b>${a.naam}</b><span class="sub">${a.why.join(" · ")}</span></span><span class="act" style="color:var(--red);font-weight:500">${a.act}</span></div>`).join("")}</div>` : ""}`;
 }
