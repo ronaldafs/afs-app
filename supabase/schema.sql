@@ -21,7 +21,7 @@ create table if not exists toolboxen (
 create table if not exists incidenten (
   id bigint generated always as identity primary key, datum text, dienst text, naam text, incident text, tijd text, waarschuwing text, voorman text, opmerking text, created_at timestamptz default now());
 create table if not exists dienstrapport (
-  datum text, dienst text, route text, medewerker text, doel text, gehaald text, gemist text, reden text, opmerking text, voorman text,
+  datum text, dienst text, route text, medewerker text, doel text, gehaald text, gemist text, eerste_scan text, laatste_scan text, reden text, opmerking text, voorman text,
   kantoor text, actie text, wie text, status text, gecontroleerd_door text, gecontroleerd_op text, afgerond_door text, afgerond_op text,
   updated_at timestamptz default now(), primary key (datum, dienst, route));
 create table if not exists doelen (
@@ -47,3 +47,7 @@ do $$ declare t text; begin
     execute format('create policy "auth all" on %I for all to authenticated using (true) with check (true)', t);
   end loop;
 end $$;
+
+-- Bestaande database bijwerken (veilig om opnieuw te draaien)
+alter table dienstrapport add column if not exists eerste_scan text;
+alter table dienstrapport add column if not exists laatste_scan text;
