@@ -251,8 +251,18 @@ function renderInc(){
     <td><span class="freq ${i.freq>=3?"f3":i.freq===2?"f2":""}">${i.freq}e keer</span></td>
     <td>${i.waarschuwing||""}</td><td>${i.voorman||""}</td><td style="white-space:normal;max-width:260px;color:var(--muted);font-size:12.5px">${i.opmerking||""}</td></tr>`).join("");
 }
+/* ============ DAG-NAVIGATIE ============ */
+let DAY = iso(TODAY);
+function dayNav(id, onchange){
+  const el = document.getElementById(id); if (!el) return;
+  const lbl = DAY === iso(TODAY) ? "Vandaag" : DAY === d(-1) ? "Gisteren" : "";
+  el.innerHTML = `<button class="btn" data-n="-1" title="Vorige dag">\u2039</button><input type="date" class="search" style="min-width:150px;margin:0" value="${DAY}"><button class="btn" data-n="1" title="Volgende dag">\u203a</button><button class="btn" data-n="0">Vandaag</button><span class="hint" style="font-weight:600;color:var(--ink)">${lbl ? lbl + " \u00b7 " : ""}${new Date(DAY).toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"long"})}</span>`;
+  el.querySelectorAll("button").forEach(b => b.onclick = () => { const n = +b.dataset.n; DAY = n === 0 ? iso(TODAY) : d(daysBetween(TODAY, DAY) + n); onchange(); });
+  el.querySelector("input").onchange = e => { DAY = e.target.value; onchange(); };
+}
+
 /* ============ DIENSTRAPPORT ============ */
-let dsFilter = "alle", dsRoute = "", dsMaand = "alle", dsQ = "";
+let dsFilter = "alle", dsRoute = "", dsMaand = "alle", dsQ = "", dsMode = "dag";
 function doelVoor(route, dienst){
   const row = (DATA.doelen||[]).find(x => x.route === route);
   if (!row) return "";
@@ -264,33 +274,32 @@ function pctClass(p){ return p >= CONFIG.scanTarget ? "ok" : p >= CONFIG.scanTar
 function dsRows(){ return (DATA.dienstrapport||[]).map(r => { const doel = +r.doel||0, gehaald = +r.gehaald||0; return {...r, doel, gehaald, pct: doel ? Math.round(gehaald/doel*100) : null}; }); }
 function renderDs(){
   const all = dsRows();
-  const monthKey = s => String(s).slice(0,7);
-  const months = [...new Set(all.map(i=>monthKey(i.datum)))].sort().reverse();
+  dayNav("ds-day", renderDs);
   const sel = document.getElementById("ds-maand");
-  sel.innerHTML = `<option value="alle">Alle maanden</option>` + months.map(m=>`<option value="${m}">${new Date(m+"-01").toLocaleDateString("nl-NL",{month:"long",year:"numeric"})}</option>`).join("");
-  sel.value = dsMaand;
+  sel.innerHTML = `<option value="dag">Deze dag</option><option value="week">Deze week</option><option value="maand">Deze maand</option>`; sel.value = dsMode;
+  const inRange = r => dsMode === "dag" ? String(r.datum) === DAY : dsMode === "week" ? (String(r.datum) >= d(daysBetween(TODAY, DAY) - 6) && String(r.datum) <= DAY) : String(r.datum).slice(0,7) === DAY.slice(0,7);
   const rs = document.getElementById("ds-route");
   rs.innerHTML = `<option value="">Alle routes</option>` + CONFIG.routes.map(r=>`<option ${dsRoute===r?"selected":""}>${r}</option>`).join("");
-  let rows = all.filter(r => (dsMaand==="alle" || monthKey(r.datum)===dsMaand) && (!dsRoute || r.route===dsRoute));
+  let rows = all.filter(r => inRange(r) && (!dsRoute || r.route===dsRoute));
   const doel = rows.reduce((a,r)=>a+r.doel,0), gehaald = rows.reduce((a,r)=>a+r.gehaald,0);
   const pct = doel ? Math.round(gehaald/doel*100) : null;
   const under = rows.filter(r => r.pct !== null && r.pct < CONFIG.scanTarget).length;
   const week = all.filter(r => String(r.datum) >= d(-7));
   const wd = week.reduce((a,r)=>a+r.doel,0), wg = week.reduce((a,r)=>a+r.gehaald,0);
   const k = [
-    ["Scanpercentage in selectie", pct===null?"–":pct+"%", pct===null?"":pctClass(pct)==="ok"?"green":pctClass(pct)==="warn"?"amber":"red"],
+    [dsMode==="dag"?"Scanpercentage deze dag":dsMode==="week"?"Scanpercentage deze week":"Scanpercentage deze maand", pct===null?"–":pct+"%", pct===null?"":pctClass(pct)==="ok"?"green":pctClass(pct)==="warn"?"amber":"red"],
     ["Afgelopen 7 dagen", wd?Math.round(wg/wd*100)+"%":"–", wd?({ok:"green",warn:"amber",bad:"red"})[pctClass(Math.round(wg/wd*100))]:""],
     ["Gemiste scans", doel-gehaald, doel-gehaald>0?"amber":""],
     ["Rapporten onder norm", under, under?"red":""],
-    ["Rapporten in selectie", rows.length, ""],
+    ["Rapporten", rows.length, ""],
   ];
   document.getElementById("ds-kpis").innerHTML = k.map(([l,v,c]) => `<div class="kpi ${c}"><b>${v}</b><span>${l}</span></div>`).join("");
   // missing reports today/yesterday alert
   const expected = CONFIG.routes.slice(0, CONFIG.coreRoutes);
-  const yest = d(-1);
+  const yest = DAY;
   const done = new Set(all.filter(r=>r.datum===yest).map(r=>r.route));
   const missing = expected.filter(r=>!done.has(r));
-  document.getElementById("ds-alert").innerHTML = actieBanner(openActies(), "Aanspreekpunten vanuit kantoor") + ((all.length && missing.length && missing.length < expected.length) ? `<div class="alert"><h4>⚠ Dienstrapport ontbreekt voor ${fmt(yest)}</h4><div class="al"><span>${missing.join(" · ")}</span><span class="act">Voorman aanspreken</span></div></div>` : "");
+  document.getElementById("ds-alert").innerHTML = actieBanner(openActies().filter(r => dsMode !== "dag" || r.datum === DAY), "Aanspreekpunten vanuit kantoor") + ((dsMode==="dag" && all.length && missing.length && missing.length < expected.length && DAY < iso(TODAY)) ? `<div class="alert"><h4>⚠ Dienstrapport ontbreekt voor ${fmt(yest)}</h4><div class="al"><span>${missing.join(" · ")}</span><span class="act">Voorman aanspreken</span></div></div>` : "");
   const chips = [["alle","Alle"],["bevestig","Te bevestigen"],["onder","Onder norm"],["ok","Norm gehaald"],["actie","Actie open"]];
   document.getElementById("ds-chips").innerHTML = chips.map(([v,l])=>`<button class="chip ${dsFilter===v?"on":""}" data-f="${v}">${l} <span class="num">${v==="alle"?rows.length:v==="bevestig"?rows.filter(r=>r.status==="Te bevestigen").length:v==="onder"?rows.filter(r=>r.pct!==null&&r.pct<CONFIG.scanTarget).length:v==="actie"?rows.filter(r=>r.actie&&r.status!=="Afgerond").length:rows.filter(r=>r.pct!==null&&r.pct>=CONFIG.scanTarget).length}</span></button>`).join("");
   document.querySelectorAll("#ds-chips .chip").forEach(c => c.onclick = () => { dsFilter = c.dataset.f; renderDs(); });
@@ -330,7 +339,7 @@ function actieBanner(list, titel){
   return `<div class="alert"><h4>⚠ ${titel}: ${list.length} open</h4>${list.sort((a,b)=>String(b.datum).localeCompare(String(a.datum))).map(r=>`<div class="al"><span><b>${r.medewerker||"–"}</b> · ${r.route} · ${fmt(r.datum)} ${r.dienst}<span class="sub">${r.kantoor||""}</span></span><span style="display:flex;gap:10px;align-items:center"><span class="act">${r.actie} (${r.wie||"Voorman"})</span><button class="btn" style="padding:4px 10px" onclick="markDone('${dsKey(r).replace(/'/g,"")}')">Besproken</button></span></div>`).join("")}</div>`;
 }
 document.getElementById("ds-q").oninput = e => { dsQ = e.target.value; renderDs(); };
-document.getElementById("ds-maand").onchange = e => { dsMaand = e.target.value; renderDs(); };
+document.getElementById("ds-maand").onchange = e => { dsMode = e.target.value; renderDs(); };
 document.getElementById("ds-route").onchange = e => { dsRoute = e.target.value; renderDs(); };
 let dsEditRow = null;
 function openDsEdit(key){
@@ -353,7 +362,7 @@ document.getElementById("dsBtn").onclick = () => {
   document.getElementById("s-datum").onchange = fill;
   rs.onchange = fill; document.getElementById("s-dienst").onchange = fill;
   const h = new Date().getHours(); document.getElementById("s-dienst").value = h < 14 ? "Ochtend" : h < 22 ? "Middag" : "Nacht";
-  document.getElementById("s-datum").value = iso(TODAY); document.getElementById("s-voorman").value = document.getElementById("s-voorman").value || who();
+  document.getElementById("s-datum").value = DAY; document.getElementById("s-voorman").value = document.getElementById("s-voorman").value || who();
   fill(); openModal("ds");
 };
 document.getElementById("doelBtn").onclick = () => {
@@ -729,9 +738,9 @@ function scanStats(date, dienst, routeName){
 }
 function renderScans(){
   const dates = [...new Set((DATA.scans||[]).map(s=>s.op_date))].sort();
-  const dEl = document.getElementById("scan-date");
-  if (!dEl.value) dEl.value = dates[dates.length-1] || iso(TODAY);
-  const date = dEl.value, shiftF = document.getElementById("scan-shift").value;
+  dayNav("scan-day", renderScans);
+  const dEl = document.getElementById("scan-date"); dEl.value = DAY;
+  const date = DAY, shiftF = document.getElementById("scan-shift").value;
   document.getElementById("scan-status").textContent = dates.length ? `${(DATA.scans||[]).length} scans geladen, ${fmt(dates[0])} t/m ${fmt(dates[dates.length-1])} (laatste ${CONFIG.scanDays} dagen).` : "Nog geen scans. Lees de EcoSmart-export in (xlsx of csv).";
   const rows = [];
   for (const pin of ROUTE_ORDER) for (const sk of ["ochtend","middag","nacht"]) {
@@ -749,7 +758,7 @@ function renderScans(){
       ${r.missed.length ? `<details open><summary>${r.expected-r.done} bezoeken gemist bij ${r.missed.length} winkels</summary><div class="shops">${r.missed.map(m=>`<span class="shop">${m}</span>`).join("")}</div></details>` : `<div class="sub" style="margin-top:6px">Alle winkels gescand.</div>`}
     </div>`; }).join("") : `<div class="empty">Geen scans voor ${fmt(date)}. Kies een andere datum of lees een export in.</div>`;
 }
-document.getElementById("scan-date").onchange = renderScans;
+document.getElementById("scan-date").onchange = e => { DAY = e.target.value; renderScans(); };
 document.getElementById("scan-shift").onchange = renderScans;
 document.getElementById("scan-file").onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -765,7 +774,7 @@ document.getElementById("scan-file").onchange = async e => {
     for (let i = 0; i < rows.length; i += 500) { st.textContent = `Opslaan… ${Math.min(i+500, rows.length)}/${rows.length}`; const { error } = await SB.from("scans").upsert(rows.slice(i, i+500), { onConflict: "ts,shop,pin", ignoreDuplicates: true }); if (error) throw error; }
     const dates = [...new Set(rows.map(r=>r.op_date))].sort();
     toast(`${rows.length} scans ingelezen (${fmt(dates[0])} t/m ${fmt(dates[dates.length-1])})`);
-    await load(); document.getElementById("scan-date").value = dates[dates.length-1]; renderScans();
+    await load(); DAY = dates[dates.length-1]; renderScans();
   } catch (err) { st.textContent = "Inlezen mislukt: " + (err.message||err); }
   e.target.value = "";
 };
@@ -782,30 +791,34 @@ document.getElementById("scan-gen").onclick = async () => {
     upsertLocal(DATA.dienstrapport = DATA.dienstrapport||[], row, KEYS.dienstrapport); n++;
   }
   toast(`${n} dienstrapporten aangemaakt of bijgewerkt${skipped?`, ${skipped} al bevestigd en overgeslagen`:""}`);
-  renderScans();
+  DAY = date; dsMode = "dag"; setView("dienst");
 };
 
 /* ============ OVERZICHT (home) ============ */
 function renderHome(){
+  dayNav("home-day", renderHome);
   const all = actieve().map(build);
   const red = all.filter(x=>x.status==="red").length, amber = all.filter(x=>x.status==="amber").length;
   const inc30 = withFreq(DATA.incidenten||[]).filter(i => String(i.datum) >= d(-30));
   const alerts = incidentAlerts(DATA.incidenten||[]);
-  const ds = dsRows(); const week = ds.filter(r => String(r.datum) >= d(-7)); const wd = week.reduce((a,r)=>a+r.doel,0), wg = week.reduce((a,r)=>a+r.gehaald,0);
-  const tbv = ds.filter(r => r.status === "Te bevestigen").length;
+  const ds = dsRows(); const dag = ds.filter(r => String(r.datum) === DAY); const wd = dag.reduce((a,r)=>a+r.doel,0), wg = dag.reduce((a,r)=>a+r.gehaald,0);
+  const week = ds.filter(r => String(r.datum) >= d(daysBetween(TODAY, DAY) - 6) && String(r.datum) <= DAY); const wkd = week.reduce((a,r)=>a+r.doel,0), wkg = week.reduce((a,r)=>a+r.gehaald,0);
+  const tbv = dag.filter(r => r.status === "Te bevestigen").length;
   const oa = openActies();
-  const yest = d(-1); const missing = CONFIG.routes.slice(0, CONFIG.coreRoutes).filter(rn => !ds.some(r => r.datum===yest && r.route===rn));
+  const incDag = withFreq(DATA.incidenten||[]).filter(i => String(i.datum) === DAY);
+  const yest = DAY; const missing = CONFIG.routes.slice(0, CONFIG.coreRoutes).filter(rn => !ds.some(r => r.datum===yest && r.route===rn));
   const evOpen = all.reduce((s,x)=>s+x.evs.filter(e=>e.due && !e.e).length,0);
   document.getElementById("home-name").textContent = who() ? ", " + who().split(" ")[0] : "";
   document.getElementById("home-body").innerHTML = `
     <div class="home-grid">
-      <div class="home-card" onclick="setView('dienst')"><h3>Scans afgelopen 7 dagen</h3><b style="color:${wd?({ok:"var(--green)",warn:"var(--amber)",bad:"var(--red)"})[pctClass(Math.round(wg/wd*100))]:"var(--ink)"}">${wd?Math.round(wg/wd*100)+"%":"–"}</b><div class="sub">${wd?`${wg} van ${wd} winkels gescand · norm ${CONFIG.scanTarget}%`:"nog geen dienstrapporten"}</div></div>
-      <div class="home-card" onclick="dsFilter='bevestig';setView('dienst')"><h3>Dienstrapporten te bevestigen</h3><b style="color:${tbv?"var(--amber)":"var(--ink)"}">${tbv}</b><div class="sub">${missing.length && ds.length ? `${missing.length} routes zonder rapport voor ${fmt(yest)}` : "alle routes van gisteren gerapporteerd"}</div></div>
+      <div class="home-card" onclick="dsMode='dag';setView('dienst')"><h3>Scans deze dag</h3><b style="color:${wd?({ok:"var(--green)",warn:"var(--amber)",bad:"var(--red)"})[pctClass(Math.round(wg/wd*100))]:"var(--ink)"}">${wd?Math.round(wg/wd*100)+"%":"–"}</b><div class="sub">${wd?`${wg} van ${wd} bezoeken gescand · norm ${CONFIG.scanTarget}%`:"nog geen dienstrapporten voor deze dag"}${wkd?` · week ${Math.round(wkg/wkd*100)}%`:""}</div></div>
+      <div class="home-card" onclick="dsFilter='bevestig';dsMode='dag';setView('dienst')"><h3>Dienstrapporten te bevestigen</h3><b style="color:${tbv?"var(--amber)":"var(--ink)"}">${tbv}</b><div class="sub">${dag.length ? (missing.length ? `${missing.length} routes zonder rapport` : "alle routes gerapporteerd") : "nog geen rapporten voor deze dag"}</div></div>
       <div class="home-card" onclick="setView('dienst')"><h3>Aanspreekpunten kantoor</h3><b style="color:${oa.length?"var(--red)":"var(--ink)"}">${oa.length}</b><div class="sub">${oa.length?[...new Set(oa.map(r=>r.medewerker||r.route))].slice(0,4).join(" · "):"niets open"}</div></div>
       <div class="home-card" onclick="filter='red';setView('onb')"><h3>Medewerkers actie nodig</h3><b style="color:${red?"var(--red)":"var(--ink)"}">${red}</b><div class="sub">${amber} aandacht · ${evOpen} evaluaties open</div></div>
-      <div class="home-card" onclick="setView('inc')"><h3>Incidenten 30 dagen</h3><b>${inc30.length}</b><div class="sub">${inc30.filter(i=>incClass(i.incident)==="noshow").length} no-show · ${inc30.filter(i=>incClass(i.incident)==="telaat").length} te laat · ${inc30.filter(i=>incClass(i.incident)==="ziek").length} ziek</div></div>
+      <div class="home-card" onclick="setView('inc')"><h3>Incidenten deze dag</h3><b style="color:${incDag.length?"var(--amber)":"var(--ink)"}">${incDag.length}</b><div class="sub">${incDag.length?incDag.map(i=>i.naam+" · "+i.incident).slice(0,2).join(" · "):"geen incidenten"} · 30 dagen: ${inc30.length}</div></div>
       <div class="home-card" onclick="setView('inc')"><h3>Signalering herhalers</h3><b style="color:${alerts.length?"var(--red)":"var(--ink)"}">${alerts.length}</b><div class="sub">${alerts.length?alerts.slice(0,3).map(a=>a.naam).join(" · "):"niemand valt op"}</div></div>
     </div>
+    ${dag.length ? `<div class="home-list"><h3 style="font-size:13px;margin:12px 0 4px">Scans per route \u00b7 ${fmt(DAY)}</h3>${dag.sort((x,y)=>(x.dienst+x.route).localeCompare(y.dienst+y.route)).map(r=>`<div class="tb"><span><span class="dienst ${(r.dienst||"").toLowerCase()}">${r.dienst}</span> <b>${r.route}</b> <span class="sub">${r.medewerker||"–"}${r.reden?" · "+r.reden:""}</span></span><span style="display:flex;gap:8px;align-items:center"><span class="num sub">${r.gehaald}/${r.doel}</span>${r.pct===null?"":`<span class="pct ${pctClass(r.pct)}">${r.pct}%</span>`}${r.status==="Te bevestigen"?`<span class="st amber"><i></i>te bevestigen</span>`:""}</span></div>`).join("")}</div>` : ""}
     ${oa.length ? `<div class="home-list"><h3 style="font-size:13px;margin:12px 0 4px">Aanspreekpunten vanuit kantoor</h3>${oa.slice(0,6).map(r=>`<div class="tb"><span><b>${r.medewerker||"–"}</b> · ${r.route} · ${fmt(r.datum)}<span class="sub">${r.kantoor||""}</span></span><span class="act" style="color:var(--red);font-weight:500">${r.actie}${r.wie?" ("+r.wie+")":""}</span></div>`).join("")}</div>` : ""}
     ${alerts.length ? `<div class="home-list"><h3 style="font-size:13px;margin:12px 0 4px">Signalering incidenten</h3>${alerts.slice(0,6).map(a=>`<div class="tb"><span><b>${a.naam}</b><span class="sub">${a.why.join(" · ")}</span></span><span class="act" style="color:var(--red);font-weight:500">${a.act}</span></div>`).join("")}</div>` : ""}`;
 }
