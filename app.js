@@ -196,15 +196,17 @@ function renderDetail(x){
 async function load(){
   const src = document.getElementById("src");
   try {
-    const out = {};
+    const out = {}, missing = [];
     for (const t of Object.keys(TABLES)) {
       let q = SB.from(t).select("*").limit(20000);
       if (t === "scans") q = SB.from(t).select("*").gte("op_date", d(-CONFIG.scanDays)).order("ts").limit(50000);
-      const { data, error } = await q; if (error) throw error; out[t] = data || [];
+      const { data, error } = await q;
+      if (error) { if (/schema cache|does not exist/i.test(error.message)) { out[t] = []; missing.push(t); continue; } throw error; }
+      out[t] = data || [];
     }
     DATA = out;
     DATA.scans.forEach(s => { s.ts = new Date(s.ts); });
-    src.classList.add("live"); src.querySelector("span").textContent = "Live \u00b7 " + new Date().toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"});
+    src.classList.add("live"); src.querySelector("span").textContent = "Live \u00b7 " + new Date().toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"}) + (missing.length ? " \u00b7 tabel ontbreekt: " + missing.join(", ") : "");
   } catch (e) { src.classList.remove("live"); src.querySelector("span").textContent = "Laden mislukt: " + (e.message||e); }
   refresh();
 }
