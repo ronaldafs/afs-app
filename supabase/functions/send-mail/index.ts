@@ -2,6 +2,9 @@
 // Verstuurt (1) direct een mail bij een bevestigd dienstrapport onder de norm of een kantoor-aanspreekpunt (database webhook)
 // en (2) een dagrapport (cron of knop in de app). Mail gaat via Resend (https://resend.com).
 //
+// Mailt ook automatisch een shiftrapport zodra de voorman alle routes van een dienst heeft bevestigd,
+// en na de avonddienst het dagrapport van de hele dag (elke mail maximaal één keer, via mail_log).
+//
 // Secrets (Supabase → Edge Functions → Secrets):
 //   RESEND_API_KEY   = re_xxx
 //   MAIL_FROM        = "AFS Operatie Schiphol <operatie@jouwdomein.nl>"   (domein geverifieerd in Resend)
@@ -20,7 +23,8 @@ const esc = (s: any) => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", 
 const chip = (t: string, bg: string, c: string) => `<span style="display:inline-block;font-size:12px;padding:2px 9px;border-radius:999px;background:${bg};color:${c};margin:2px 4px 2px 0">${esc(t)}</span>`;
 const scoreChip = (p: number | null) => p === null ? "–" : chip(p + "%", p >= TARGET ? "#E6F4EC" : p >= TARGET - 10 ? "#FBF1DC" : "#FBE7E7", p >= TARGET ? "#1F8A5B" : p >= TARGET - 10 ? "#B7791F" : "#C62828");
 
-async function recipients(kind: "dagrapport" | "onder_norm" | "aanspreekpunt") {
+const SHIFT_ROUTES: Record<string, string[]> = { Ochtend: ["Lounge 1 dag","Lounge 2 dag","Lounge 3 dag","Plaza dag","KLM dag"], Middag: ["Lounge 1 avond","Lounge 2 avond","Lounge 3 avond","Plaza avond","KLM avond"], Nacht: ["Nacht"] };
+async function recipients(kind: "dagrapport" | "onder_norm" | "aanspreekpunt" | "shiftrapport") {
   const { data } = await sb.from("mail_ontvangers").select("*").eq(kind, true).eq("actief", true);
   return (data || []).map(r => r.email);
 }
@@ -50,6 +54,23 @@ function rapportHtml(r: any) {
   </table>`;
 }
 
+async function alreadySent(datum: string, dienst: string, type: string) {
+  const { data } = await sb.from("mail_log").select("id").eq("datum", datum).eq("dienst", dienst).eq("type", type).maybeSingle();
+  if (data) return true;
+  await sb.from("mail_log").insert({ datum, dienst, type });
+  return false;
+}
+async function shiftrapport(datum: string, dienst: string) {
+  const { data: rows } = await sb.from("dienstrapport").select("*").eq("datum", datum).eq("dienst", dienst);
+  const rs = rows || []; const doel = rs.reduce((a, r) => a + (+r.doel || 0), 0), gehaald = rs.reduce((a, r) => a + (+r.gehaald || 0), 0);
+  const total = doel ? Math.round(gehaald / doel * 100) : null;
+  const onder = rs.filter(r => pct(r) !== null && pct(r)! < TARGET);
+  const html = `<h2 style="margin:0 0 4px;font-size:20px">${esc(dienst)}dienst ${fmt(datum)} afgerond</h2>
+    <p style="margin:0 0 18px;color:#6B7280">Alle routes zijn bevestigd door de voorman. Scans: <b style="color:#17203A">${gehaald} van ${doel}</b> bezoeken ${scoreChip(total)}</p>
+    <table style="border-collapse:collapse;width:100%;font-size:13px">${rs.sort((a, b) => a.route.localeCompare(b.route)).map(r => `<tr style="border-bottom:1px solid #E4E8EF"><td style="padding:6px 8px 6px 0"><b>${esc(r.route)}</b></td><td style="padding:6px 8px 6px 0">${esc(r.medewerker || "–")}</td><td style="padding:6px 8px 6px 0">${esc(r.gehaald)}/${esc(r.doel)}</td><td style="padding:6px 0">${scoreChip(pct(r))}</td><td style="padding:6px 0;color:#6B7280">${esc(r.reden || "")}${r.opmerking ? " · " + esc(r.opmerking) : ""}</td><td style="padding:6px 0;color:#6B7280">${esc(r.voorman || "")}</td></tr>`).join("")}</table>
+    ${onder.length ? `<h3 style="font-size:14px;margin:18px 0 8px;color:#C62828">Onder de norm (${onder.length})</h3>${onder.map(rapportHtml).join('<hr style="border:0;border-top:1px solid #E4E8EF;margin:10px 0">')}` : ""}`;
+  return send(await recipients("shiftrapport"), `${dienst}dienst ${fmt(datum)} · ${total === null ? "" : total + "% gescand"} · alle routes bevestigd`, html);
+}
 async function dagrapport(datum?: string) {
   const day = datum || new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const { data: rows } = await sb.from("dienstrapport").select("*").eq("datum", day);
@@ -82,6 +103,16 @@ Deno.serve(async (req) => {
         out.onder_norm = await send(await recipients("onder_norm"), `Route onder de norm: ${r.route} ${r.dienst} ${fmt(r.datum)} · ${p}%`, `<h2 style="margin:0 0 12px;font-size:18px">Dienstrapport onder de norm</h2>${rapportHtml(r)}`);
       if (r.actie && r.status !== "Afgerond" && (r.actie !== old.actie || r.kantoor !== old.kantoor))
         out.aanspreekpunt = await send(await recipients("aanspreekpunt"), `Aanspreekpunt: ${r.medewerker || r.route} · ${r.actie}`, `<h2 style="margin:0 0 12px;font-size:18px">Nieuw aanspreekpunt vanuit kantoor</h2>${rapportHtml(r)}`);
+      // Shift compleet? Alle verwachte routes van deze dienst bevestigd → shiftrapport; na de middag-/avonddienst ook het dagrapport van de hele dag.
+      if (r.status === "Bevestigd" && old.status !== "Bevestigd" && SHIFT_ROUTES[r.dienst]) {
+        const { data: all } = await sb.from("dienstrapport").select("route,status").eq("datum", r.datum).eq("dienst", r.dienst);
+        const present = (all || []).filter(x => SHIFT_ROUTES[r.dienst].includes(x.route));
+        const complete = present.length >= SHIFT_ROUTES[r.dienst].length && present.every(x => x.status === "Bevestigd");
+        if (complete && !(await alreadySent(r.datum, r.dienst, "shift"))) {
+          out.shiftrapport = await shiftrapport(r.datum, r.dienst);
+          if (r.dienst === "Middag" && !(await alreadySent(r.datum, "dag", "dag"))) out.dagrapport = await dagrapport(r.datum);
+        }
+      }
       return Response.json(out);
     }
     return Response.json({ ok: true, note: "niets te doen" });
