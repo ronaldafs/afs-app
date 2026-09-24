@@ -308,11 +308,12 @@ function renderDs(){
   document.getElementById("ds-empty").style.display = rows.length?"none":"block";
   document.getElementById("ds-rows").innerHTML = rows.map(r=>`<tr style="cursor:default">
     <td class="num">${fmt(r.datum)}</td><td><span class="dienst ${(r.dienst||"").toLowerCase()}">${r.dienst||"–"}</span></td><td>${r.route||""}</td><td class="name">${r.medewerker||""}</td>
-    <td class="num">${r.doel||""}</td><td class="num">${r.gehaald}</td><td>${r.pct===null?"–":`<span class="pct ${pctClass(r.pct)}">${r.pct}%</span>`}</td>
+    <td class="num">${r.doel||""}</td><td class="num">${r.gehaald}</td><td>${r.pct===null?"–":`<span class="pct ${pctClass(r.pct)}">${r.pct}%</span>`}${(() => { const st = scanStats(r.datum, r.dienst, r.route); return st && (st.done !== r.gehaald || st.expected !== r.doel) ? `<div><span class="st amber" style="padding:1px 7px;font-size:11px" title="De scans zijn veranderd sinds dit rapport is gemaakt"><i></i>scans nu ${st.done}/${st.expected}</span> <button class="lnk ds-sync" data-k="${dsKey(r)}">bijwerken</button></div>` : ""; })()}</td>
     <td style="white-space:normal;max-width:240px">${r.status==="Te bevestigen"?`<span class="st amber"><i></i>Te bevestigen</span> `:""}${r.reden||""}${r.gemist?`<details><summary style="font-size:12px;color:var(--blue);cursor:pointer">Niet gescand (${r.gemist.split("|").length})</summary><div class="shops">${r.gemist.split("|").map(g=>`<span class="shop">${g}</span>`).join("")}</div></details>`:""}</td><td style="white-space:normal;max-width:220px;color:var(--muted);font-size:12.5px">${r.opmerking||""}</td><td>${r.voorman||""}${r.status==="Te bevestigen"?` <button class="lnk ds-confirm" data-k="${dsKey(r)}">bevestigen</button>`:""}</td>
     <td style="white-space:normal;max-width:240px;font-size:12.5px">${kcCell(r)}</td></tr>`).join("");
   document.querySelectorAll("#ds-rows .kc-open").forEach(b => b.onclick = e => { e.stopPropagation(); openKc(b.dataset.k); });
   document.querySelectorAll("#ds-rows .ds-confirm").forEach(b => b.onclick = e => { e.stopPropagation(); openDsEdit(b.dataset.k); });
+  document.querySelectorAll("#ds-rows .ds-sync").forEach(b => b.onclick = async e => { e.stopPropagation(); const r = (DATA.dienstrapport||[]).find(x => dsKey(x) === b.dataset.k); const st = scanStats(r.datum, r.dienst, r.route); if (!st) return; await save("dienstrapport", KEYS.dienstrapport, {...r, doel:String(st.expected), gehaald:String(st.done), gemist: st.missed.join("|")}, `${r.route}: bijgewerkt naar ${st.done}/${st.expected}`); renderDs(); });
   document.querySelectorAll("#ds-rows .kc-done").forEach(b => b.onclick = e => { e.stopPropagation(); markDone(b.dataset.k); });
 }
 const dsKey = r => [r.datum, r.dienst, r.route].join("|");
@@ -774,7 +775,12 @@ document.getElementById("scan-file").onchange = async e => {
     for (let i = 0; i < rows.length; i += 500) { st.textContent = `Opslaan… ${Math.min(i+500, rows.length)}/${rows.length}`; const { error } = await SB.from("scans").upsert(rows.slice(i, i+500), { onConflict: "ts,shop,pin", ignoreDuplicates: true }); if (error) throw error; }
     const dates = [...new Set(rows.map(r=>r.op_date))].sort();
     toast(`${rows.length} scans ingelezen (${fmt(dates[0])} t/m ${fmt(dates[dates.length-1])})`);
-    await load(); DAY = dates[dates.length-1]; renderScans();
+    await load();
+    // bestaande dienstrapporten van deze dagen bijwerken met de nieuwe scancijfers (voorman-invoer blijft staan)
+    let upd = 0;
+    for (const r of (DATA.dienstrapport||[]).filter(x => dates.includes(x.datum))) { const st = scanStats(r.datum, r.dienst, r.route); if (st && (String(st.expected) !== String(r.doel) || String(st.done) !== String(r.gehaald))) { const row = {...r, doel:String(st.expected), gehaald:String(st.done), gemist: st.missed.join("|")}; const res = await post("upsert", {tab:"dienstrapport", keys: KEYS.dienstrapport, row}); if (!res.error) { upsertLocal(DATA.dienstrapport, row, KEYS.dienstrapport); upd++; } } }
+    if (upd) toast(`${upd} dienstrapporten bijgewerkt met de nieuwe scans`);
+    DAY = dates[dates.length-1]; renderScans();
   } catch (err) { st.textContent = "Inlezen mislukt: " + (err.message||err); }
   e.target.value = "";
 };
@@ -784,13 +790,13 @@ document.getElementById("scan-gen").onclick = async () => {
   for (const pin of ROUTE_ORDER) for (const sk of ["ochtend","middag","nacht"]) {
     const rn = routeNameFor(pin, sk); if (!rn) continue;
     const st = scanStats(date, SHIFT_NL[sk], rn); if (!st) continue;
-    const existing = (DATA.dienstrapport||[]).find(r => r.datum===date && r.dienst===SHIFT_NL[sk] && r.route===rn);
-    if (existing && existing.status !== "Te bevestigen") { skipped++; continue; }
-    const row = { ...(existing||{}), datum: date, dienst: SHIFT_NL[sk], route: rn, doel: String(st.expected), gehaald: String(st.done), gemist: st.missed.join("|"), status: "Te bevestigen", voorman: existing ? existing.voorman : "" };
+    const existing = (DATA.dienstrapport||{}) && (DATA.dienstrapport||[]).find(r => r.datum===date && r.dienst===SHIFT_NL[sk] && r.route===rn);
+    if (existing && String(existing.doel)===String(st.expected) && String(existing.gehaald)===String(st.done) && (existing.gemist||"")===st.missed.join("|")) { skipped++; continue; }
+    const row = { ...(existing||{}), datum: date, dienst: SHIFT_NL[sk], route: rn, doel: String(st.expected), gehaald: String(st.done), gemist: st.missed.join("|"), status: existing && existing.status && existing.status !== "Te bevestigen" ? existing.status : "Te bevestigen", voorman: existing ? existing.voorman : "" };
     const res = await post("upsert", { tab: "dienstrapport", keys: KEYS.dienstrapport, row }); if (res.error) { toast("Mislukt: " + res.error); return; }
     upsertLocal(DATA.dienstrapport = DATA.dienstrapport||[], row, KEYS.dienstrapport); n++;
   }
-  toast(`${n} dienstrapporten aangemaakt of bijgewerkt${skipped?`, ${skipped} al bevestigd en overgeslagen`:""}`);
+  toast(`${n} dienstrapporten aangemaakt of bijgewerkt${skipped?`, ${skipped} ongewijzigd`:""}`);
   DAY = date; dsMode = "dag"; setView("dienst");
 };
 
