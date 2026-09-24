@@ -27,12 +27,13 @@
 
   <div id="view-home">
     <div class="page-head"><div><h2>Goedendag<span id="home-name"></span></h2><p class="lead">Dit is de stand van vandaag. Rood vraagt om actie, oranje om aandacht.</p></div><div class="page-actions"><button class="btn primary" id="home-ds">+ Dienstrapport</button><button class="btn" id="home-inc">+ Incident</button></div></div>
+    <div class="bar" id="home-day"></div>
     <div id="home-body"></div>
   </div>
   <div id="view-scans" style="display:none">
     <div class="page-head"><div><h2>Scans</h2><p class="lead">Lees de EcoSmart-export in. Per route zie je direct welke winkels wel en niet zijn gescand.</p></div><div class="page-actions"><label class="btn primary" for="scan-file">EcoSmart-export inlezen<input type="file" id="scan-file" accept=".xlsx,.xls,.csv" style="display:none"></label><a class="btn" href="scan.html" target="_blank">Uitgebreid scan-dashboard</a></div></div>
     <div id="scan-status" class="hint" style="margin-bottom:10px"></div>
-    <div class="bar"><label class="fld">Datum <input type="date" id="scan-date" class="search" style="min-width:160px;margin:0"></label><label class="fld">Dienst <select id="scan-shift" class="search" style="min-width:140px;margin:0"><option value="">Alle</option><option value="ochtend">Ochtend</option><option value="middag">Middag</option><option value="nacht">Nacht</option></select></label><span class="spacer"></span><button class="btn" id="scan-gen">Dienstrapporten aanmaken voor deze dag</button></div>
+    <div class="bar"><span id="scan-day" style="display:flex;gap:6px;align-items:center"></span><input type="date" id="scan-date" style="display:none"><label class="fld">Dienst <select id="scan-shift" class="search" style="min-width:140px;margin:0"><option value="">Alle</option><option value="ochtend">Ochtend</option><option value="middag">Middag</option><option value="nacht">Nacht</option></select></label><span class="spacer"></span><button class="btn" id="scan-gen">Dienstrapporten aanmaken voor deze dag</button></div>
     <div class="kpis" id="scan-kpis"></div>
     <div id="scan-body"></div>
   </div>
@@ -79,7 +80,7 @@
     <div class="bar">
       <div class="chips" id="ds-chips"></div>
       <select class="search" id="ds-route" style="min-width:150px"><option value="">Alle routes</option></select>
-      <select class="search" id="ds-maand" style="min-width:150px"></select>
+      <span id="ds-day" style="display:flex;gap:6px;align-items:center"></span><select class="search" id="ds-maand" style="min-width:130px;margin-left:0"></select>
       <input class="search" id="ds-q" placeholder="Zoek op naam of voorman" style="margin-left:0">
     </div>
     <div class="card tbl"><table>
