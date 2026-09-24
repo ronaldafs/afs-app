@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scan Route Dashboard — Renewi</title>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f5f7f0;color:#1a2f1a;font-family:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-size:14px;font-feature-settings:'cv11','ss01','ss03';letter-spacing:-0.01em}
+#topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 28px;background:linear-gradient(135deg,#0d2b1a 0%,#1a4a2e 25%,#1a3d5c 50%,#2d1b4e 75%,#1a4a2e 100%);color:#e8f0e0;border-bottom:none;box-shadow:0 4px 32px -4px rgba(26,74,46,0.45),0 1px 0 rgba(255,255,255,0.08) inset,0 0 60px -10px rgba(90,130,180,0.3);position:relative;overflow:hidden}
+#topbar::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(ellipse at 30% 20%,rgba(100,160,220,0.15) 0%,transparent 50%),radial-gradient(ellipse at 70% 60%,rgba(140,100,200,0.12) 0%,transparent 50%),radial-gradient(ellipse at 50% 80%,rgba(80,180,120,0.1) 0%,transparent 50%);pointer-events:none}
+#topbar h1{color:#e8f0e0;font-weight:700;font-size:16px;letter-spacing:-0.02em;position:relative;z-index:1}
+.sub{font-size:11.5px;color:rgba(210,230,200,0.85);margin-top:3px;font-weight:500;position:relative;z-index:1}
+#ct{display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:relative;z-index:1}
+#ct label{color:rgba(210,230,200,0.9);font-weight:500;font-size:11.5px}
+#ct select,#ct input{background:rgba(255,255,255,0.92);color:#1a2f1a;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:7px 12px;font-weight:500;font-family:inherit;font-size:12px;transition:all .15s}
+#ct select:hover,#ct input:hover{background:#ffffff;border-color:rgba(255,255,255,0.5)}
+#ct select:focus,#ct input:focus{outline:none;background:#ffffff;border-color:#7cb8e0;box-shadow:0 0 0 3px rgba(124,184,224,0.35)}
+#mainnav{display:flex;background:#f0f2eb;border-bottom:1px solid #d5e0d0;padding:0 24px;gap:4px;box-shadow:0 1px 2px rgba(26,47,26,0.03)}
+.mnb{background:none;border:none;padding:14px 14px;font-size:13px;color:#5a7a5a;cursor:pointer;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:0}
+.mnb:hover{color:#2d4a2d}
+.mnb.active{color:#1a3d5c;border-bottom-color:#4a80a8;font-weight:600}
+#shiftbar{padding:10px 24px;background:transparent;border-bottom:1px solid #d5e0d0}
+.shb{font-size:11px;padding:4px 12px;border-radius:999px;border:1px solid #c5d5c0;background:#f0f2eb;color:#5a7a5a;font-weight:500}
+.shb.och{border-color:#b8d8a0;color:#3d6a2d;background:#eaf5e0}
+.shb.mid{border-color:#a0c8d8;color:#2d5a6a;background:#e0eef5}
+.shb.nac{border-color:#c0a8d8;color:#4a2d6a;background:#f0e8f5}
+#lb{display:flex;gap:14px;flex-wrap:wrap;padding:8px 24px;background:transparent;border-bottom:1px solid #d5e0d0}
+.lg{display:flex;align-items:center;gap:4px;font-size:10.5px;color:#5a7a5a;font-weight:500}
+.ld{width:7px;height:7px;border-radius:50%}
+#st{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:14px 24px;background:transparent;border-bottom:1px solid #d5e0d0}
+.sv{background:#f8faf5;border:none;border-radius:12px;padding:14px 12px 10px;box-shadow:0 1px 2px rgba(26,47,26,0.04),0 0 0 1px rgba(26,47,26,0.04);transition:box-shadow .15s,background .2s;position:relative;display:flex;align-items:center;gap:10px}
+.sv:hover{box-shadow:0 4px 12px rgba(26,47,26,0.06),0 0 0 1px rgba(26,47,26,0.06)}
+.sv.clickable{cursor:pointer;transition:all .25s ease}
+.sv.clickable:hover{transform:translateY(-2px);box-shadow:0 8px 25px -8px rgba(26,47,26,0.15),0 0 0 1px rgba(100,140,100,0.2)}
+.sv.clickable:active{transform:scale(0.97)}
+.sv .kpi-icon{font-size:28px;flex-shrink:0;width:36px;text-align:center}
+.sv .kpi-body{flex:1;min-width:0;text-align:center}
+.sn{font-size:22px;font-weight:700;color:#1a2f1a;letter-spacing:-0.03em;line-height:1.2;text-align:center}
+.sl{font-size:9.5px;color:#5a7a5a;margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;text-align:center}
+.kpi-sub{font-size:9px;color:#6a8a6a;margin-top:2px;min-height:14px;font-weight:500;text-align:center}
+.red{color:#b84030}.green{color:#2d8a40}.blue{color:#3d6a8a}.purple{color:#6a3d8a}.warm-orange{color:#b87820}
+#kpi-routes{background:#e8f0f8}#kpi-scans{background:#f0f5e8}#kpi-alerts{background:#f8e8e8}#kpi-checks{background:#f0e8f5}#kpi-notes{background:#f0e8f5}
+#data-waarschuwing{display:none;padding:8px 24px;background:#f8e0dd;border-bottom:1px solid #e08080;color:#b84030;font-size:12px;font-weight:600;text-align:center}
+#data-waarschuwing.show{display:block}
+#data-waarschuwing button{background:#b84030;color:#fff;border:none;padding:3px 12px;border-radius:6px;margin-left:10px;cursor:pointer;font-weight:600;font-size:11px}
+.route-status-overlay,.scan-detail-overlay,.alert-detail-overlay,.note-detail-overlay,.klant-checks-overlay{display:none;position:fixed;inset:0;background:rgba(26,47,26,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px}
+.route-status-overlay.show,.scan-detail-overlay.show,.alert-detail-overlay.show,.note-detail-overlay.show,.klant-checks-overlay.show{display:flex}
+.route-status-modal,.scan-detail-modal{background:#f8faf5;border-radius:16px;max-width:1000px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;box-shadow:0 24px 48px rgba(0,0,0,0.2);border:1px solid #c5d5c0}
+.route-status-modal h3,.scan-detail-modal h3{margin:0 0 16px;font-size:18px;font-weight:700;color:#1a2f1a}
+.modal-close{float:right;background:none;border:none;font-size:24px;cursor:pointer;color:#6a8a6a;padding:0 4px;line-height:1}
+.modal-close:hover{color:#1a2f1a}
+.route-status-item{display:flex;align-items:center;padding:12px 14px;border-radius:10px;margin-bottom:8px;border:1px solid #d5e0d0;background:#f8faf5}
+.route-status-item .status-icon{font-size:20px;margin-right:14px}
+.route-status-item .route-info{flex:1}
+.route-status-item .route-name{font-weight:600;font-size:14px}
+.route-status-item .route-sub{font-size:11px;color:#5a7a5a;margin-top:2px}
+.route-status-item .route-badge{font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px}
+.scan-progress-item{padding:12px 14px;border-radius:10px;margin-bottom:8px;border:1px solid #d5e0d0;background:#f8faf5}
+.scan-progress-item .progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.scan-progress-item .progress-route{font-weight:600;font-size:13px}
+.scan-progress-item .progress-numbers{font-size:12px;color:#5a7a5a}
+.scan-progress-item .progress-bar{height:6px;background:#e0e8da;border-radius:999px;overflow:hidden}
+.scan-progress-item .progress-fill{height:100%;border-radius:999px;transition:width 0.6s ease}
+.note-item{padding:10px 14px;border-radius:8px;margin-bottom:6px;background:#f8faf5;border-left:3px solid #6a3d8a;border:1px solid #d5e0d0}
+.note-item .note-time{font-size:11px;color:#5a7a5a;font-weight:500}
+.note-item .note-shop{font-weight:600;font-size:13px;color:#1a2f1a}
+.note-item .note-text{font-size:12px;color:#2d4a2d;margin-top:2px}
+.route-btn{display:inline-block;font-weight:600;padding:2px 10px;border-radius:6px;font-size:11px;letter-spacing:0.3px;border:2px solid;cursor:default}
+.route-1118{color:#1a7a3a;background:#e0f0e0;border-color:#1a7a3a}
+.route-2228{color:#8a6a10;background:#f8f0d8;border-color:#8a6a10}
+.route-3338{color:#3a6088;background:#d8e8f5;border-color:#3a6088}
+.route-4448{color:#5a2d88;background:#e8ddf5;border-color:#5a2d88}
+.route-5558{color:#983028;background:#f5e0dd;border-color:#983028}
+.route-6668{color:#1a6888;background:#d8eef5;border-color:#1a6888}
+.route-9999{color:#6a3d8a;background:#f0e8f5;border-color:#6a3d8a}
+.rep-table tr[data-route="1118"] td:first-child{border-left:3px solid #1a7a3a}
+.rep-table tr[data-route="2228"] td:first-child{border-left:3px solid #8a6a10}
+.rep-table tr[data-route="3338"] td:first-child{border-left:3px solid #3a6088}
+.rep-table tr[data-route="4448"] td:first-child{border-left:3px solid #5a2d88}
+.rep-table tr[data-route="5558"] td:first-child{border-left:3px solid #983028}
+.rep-table tr[data-route="6668"] td:first-child{border-left:3px solid #1a6888}
+.rep-table tr[data-route="9999"] td:first-child{border-left:3px solid #6a3d8a}
+#ab{display:none;background:#e8d0c8;border-bottom:1px solid #d0b0a0;padding:12px 20px;border-radius:0}
+#ab.show{display:block}
+.at{font-size:12px;font-weight:600;color:#4a1a18;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.at::before{content:'⚠️';font-size:16px}
+.allist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:6px}
+.ac{background:#f0ddd8;border:1px solid #d8c0b8;border-radius:8px;padding:6px 12px;font-size:11px;color:#3d1815;display:flex;align-items:center;gap:8px;transition:background .15s}
+.ac:hover{background:#f5e8e3}
+.ac .alert-route-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ac .alert-gap{font-weight:700;color:#8a2018;margin-left:auto;font-size:12px;white-space:nowrap}
+.ac .alert-time{color:#5a3028;font-size:10px;white-space:nowrap}
+#rg{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;padding:14px 24px}
+.rc{background:#f8faf5;border:none;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(26,47,26,0.04),0 0 0 1px rgba(26,47,26,0.05);transition:box-shadow .15s,transform .15s}
+.rc:hover{box-shadow:0 6px 20px -4px rgba(26,47,26,0.08),0 0 0 1px rgba(26,47,26,0.06);transform:translateY(-1px)}
+.rc.ha{box-shadow:0 1px 2px rgba(152,48,40,0.06),0 0 0 1px rgba(152,48,40,0.18)}
+.rh-1118{background:#e0f0e0!important;border-bottom:1px solid #c0d8c0!important}
+.rh-2228{background:#f8f0d8!important;border-bottom:1px solid #e8d8b0!important}
+.rh-3338{background:#d8e8f5!important;border-bottom:1px solid #c0d8e8!important}
+.rh-4448{background:#e8ddf5!important;border-bottom:1px solid #d8c8e8!important}
+.rh-5558{background:#f5e0dd!important;border-bottom:1px solid #e8c8c0!important}
+.rh-6668{background:#d8eef5!important;border-bottom:1px solid #b8dde8!important}
+.rc-1118 .pw,.rc-1118 .ts,.rc-1118 .sli,.rc-1118 .cli,.rc-1118 .nlist{background:#f0f8f0}
+.rc-2228 .pw,.rc-2228 .ts,.rc-2228 .sli,.rc-2228 .cli,.rc-2228 .nlist{background:#fdf8f0}
+.rc-3338 .pw,.rc-3338 .ts,.rc-3338 .sli,.rc-3338 .cli,.rc-3338 .nlist{background:#f0f4f8}
+.rc-4448 .pw,.rc-4448 .ts,.rc-4448 .sli,.rc-4448 .cli,.rc-4448 .nlist{background:#f5f0f8}
+.rc-5558 .pw,.rc-5558 .ts,.rc-5558 .sli,.rc-5558 .cli,.rc-5558 .nlist{background:#faf0ee}
+.rc-6668 .pw,.rc-6668 .ts,.rc-6668 .sli,.rc-6668 .cli,.rc-6668 .nlist{background:#f0f6f8}
+.rh{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-left:none}
+.rn{font-size:13px;font-weight:600;color:#1a2f1a;letter-spacing:-0.01em}
+.rs{color:#6a8a6a;font-weight:500;font-size:10px}
+.rm{font-size:11px;color:#5a7a5a;margin-top:3px}
+.rbg{font-size:10.5px;padding:3px 9px;border-radius:999px}
+.rok{background:#e0f0e0;color:#1a7a3a;border:none;font-weight:600}
+.ral{background:#f5e0dd;color:#983028;border:none;font-weight:600}
+.pw{padding:6px 14px 4px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e0e8da}
+.pb2{flex:1;background:#e0e8da;border-radius:999px;height:5px;overflow:hidden}
+.pf{height:100%;border-radius:999px}
+.plb{font-size:10px;color:#5a7a5a;white-space:nowrap;min-width:auto;font-variant-numeric:tabular-nums}
+.ts{display:flex;border-bottom:1px solid #d5e0d0;padding:0 14px;gap:18px}
+.t{flex:1;text-align:center;padding:10px 0;font-size:11px;color:#5a7a5a;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:6px;border-bottom:2px solid transparent}
+.t.on{color:#3d6a8a;border-bottom-color:#3d6a8a;font-weight:600}
+.sli,.cli,.nlist{padding:3px 9px;max-height:400px;overflow-y:auto}
+.sli::-webkit-scrollbar,.cli::-webkit-scrollbar,.nlist::-webkit-scrollbar{width:3px}
+.sli::-webkit-scrollbar-thumb,.cli::-webkit-scrollbar-thumb,.nlist::-webkit-scrollbar-thumb{background:#c5d5c0}
+.sr{display:flex;align-items:center;gap:5px;padding:5px 0;border-bottom:1px solid #e8f0e0;font-size:11px}
+.sr:last-child{border-bottom:none}
+.sr.pr{background:#e0f0e0;color:#2d6a2d;border-radius:8px;margin:4px 0;padding:5px 10px;font-size:10px;font-weight:600;border:none}
+.st2{color:#6a8a6a;min-width:42px;font-size:10.5px;font-weight:500}
+.sho{flex:1;color:#2d4a2d;font-weight:500;font-size:11.5px}
+.sg{font-size:10px;font-weight:600;min-width:48px;text-align:right;padding:1px 5px;border-radius:5px}
+.ga{color:#b84030;background:#f5e0dd;border-radius:3px;padding:1px 4px}
+.gw{color:#8a6a10;background:#f8f0d8;border-radius:3px;padding:1px 4px}
+.go{color:#6a8a6a}
+.cr{display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid #e0e8da;font-size:11px;color:#5a7a5a}
+.cr:last-child{border-bottom:none}
+.cr.ok{color:#1a7a3a}
+.cr.pr2{background:#e0f0e0;border-radius:3px;padding:4px 7px;margin:3px 0;color:#2d6a2d;border:none;font-size:10px}
+.cd{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:#1a2f1a}
+.nbadge{display:inline-block;background:#e0eef5;border:none;border-radius:5px;padding:1px 6px;font-size:9.5px;color:#2d5a6a;cursor:pointer;position:relative;margin-left:6px;font-weight:600}
+.nbadge:hover .ntt{display:block}
+.ntt{display:none;position:absolute;bottom:calc(100%+4px);left:0;background:#f0f2eb;border:1px solid #a0c8d8;border-radius:6px;padding:7px 10px;font-size:11px;color:#1a2f1a;min-width:180px;max-width:260px;white-space:normal;z-index:99;box-shadow:0 4px 16px rgba(26,47,26,.08);line-height:1.5}
+.ntt::after{content:'';position:absolute;top:100%;left:10px;border:5px solid transparent;border-top-color:#a0c8d8}
+.nrow{display:flex;gap:7px;padding:5px 0;border-bottom:1px solid #e0e8da;font-size:11px}
+.nrow:last-child{border-bottom:none}
+.ntime{color:#6a8a6a;min-width:42px;font-size:10px;flex-shrink:0}
+.nshop{color:#3d6a8a;min-width:100px;flex-shrink:0}
+.ntxt{color:#1a2f1a;flex:1;line-height:1.4}
+.nonotes{padding:16px;text-align:center;font-size:11px;color:#6a8a6a}
+.scan-time-badge{display:inline-flex;align-items:center;gap:2px;border-radius:4px;padding:1px 6px;font-size:9.5px;font-weight:600;margin-left:3px;white-space:nowrap}
+.scan-time-green{background:#e0f0e0;color:#1a7a3a;border:1px solid #80c080}
+.scan-time-orange{background:#fef5e0;color:#b87820;border:1px solid #e0c080}
+.scan-time-red{background:#f8e0dd;color:#b84030;border:1px solid #e08080}
+.scan-time-empty{background:#f0f2eb;color:#8a9a8a;border:1px solid #d5e0d0;font-size:10px;min-width:20px;justify-content:center}
+.scan-time-extra{background:#f0e8f5;color:#6a3d8a;border:1px dashed #b8a0d0;cursor:help;font-size:9px}
+.lr-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;margin:2px}
+.lr-ok{background:#e0f0e0;color:#1a7a3a}
+.lr-delay{background:#fef5e0;color:#b87820}
+.lr-early{background:#e0eef5;color:#3d6a8a}
+.lr-miss{background:#f8e0dd;color:#b84030}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+#ub{padding:10px 24px;border-top:1px solid #d5e0d0;display:flex;align-items:center;gap:10px;background:#f0f2eb;flex-wrap:wrap;position:sticky;bottom:0;z-index:10;box-shadow:0 -1px 2px rgba(26,47,26,0.03)}
+#ub label{font-size:12px;color:#1a2f1a;cursor:pointer;font-weight:500}
+#ub input[type=file]{font-size:12px;color:#6a8a6a}
+#lu{font-size:11px;color:#6a8a6a;margin-left:auto}
+#report-view{display:none;padding:18px 24px}
+#rep-ctrl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:14px 18px;background:#f8faf5;border-radius:14px;border:none;box-shadow:0 1px 2px rgba(26,47,26,0.04),0 0 0 1px rgba(26,47,26,0.05)}
+#rep-ctrl label{font-size:11.5px;color:#5a7a5a;font-weight:500}
+#rep-ctrl select{font-size:12px;padding:7px 12px;border:1px solid #c5d5c0;border-radius:8px;background:#f8faf5;color:#1a2f1a;font-weight:500;font-family:inherit;transition:all .15s}
+#rep-ctrl select:hover{border-color:#a0b8a0}
+#rep-ctrl select:focus{outline:none;border-color:#4a80a8;box-shadow:0 0 0 3px rgba(74,128,168,0.15)}
+.rep-btn{font-size:12px;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #c5d5c0;background:#f8faf5;color:#1a2f1a;font-weight:500;font-family:inherit;transition:all .15s}
+.rep-btn:hover{background:#eef5e8;border-color:#a0b8a0}
+.rep-btn.primary{background:#3d6a8a;border-color:#3d6a8a;color:#fff;box-shadow:0 1px 2px rgba(61,106,138,0.2)}
+.rep-btn.primary:hover{background:#2d5a7a;border-color:#2d5a7a;box-shadow:0 4px 12px rgba(61,106,138,0.25)}
+.rep-section{background:#f8faf5;border:none;border-radius:14px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 2px rgba(26,47,26,0.04),0 0 0 1px rgba(26,47,26,0.05)}
+.rep-sh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:#f8faf5;border-bottom:1px solid #d5e0d0;border-left:none}
+.rep-sh h3{font-size:14px;font-weight:600;color:#1a2f1a;letter-spacing:-0.01em}
+.rep-body{padding:14px 20px}
+.rep-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:14px}
+.rsv{background:#f8faf5;border:none;border-radius:14px;padding:18px 20px;box-shadow:0 1px 2px rgba(26,47,26,0.04),0 0 0 1px rgba(26,47,26,0.05);transition:box-shadow .15s}
+.rsv:hover{box-shadow:0 4px 16px rgba(26,47,26,0.06),0 0 0 1px rgba(26,47,26,0.06)}
+.rsn{font-size:28px;font-weight:700;letter-spacing:-0.03em;line-height:1.1;color:#1a2f1a;text-align:center}
+.rsl{font-size:10.5px;color:#6a8a6a;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-top:6px;text-align:center}
+.rep-table{width:100%;border-collapse:collapse;font-size:12px}
+.rep-table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#6a8a6a;font-weight:600;padding:10px 12px;border-bottom:1px solid #d5e0d0;text-align:left}
+.rep-table td{padding:11px 12px;border-bottom:1px solid #e8f0e0;color:#2d4a2d;font-size:12px;font-weight:500;vertical-align:middle}
+.rep-table tr:last-child td{border-bottom:none}
+.rep-table tr:hover td{background:#eef5e8}
+.bar-cell{display:flex;align-items:center;gap:6px}
+.bar-bg{flex:1;background:#e0e8da;border-radius:999px;height:6px;max-width:120px;overflow:hidden}
+.bar-fill{height:100%;border-radius:999px}
+.abadge{display:inline-block;background:#f5e0dd;border:none;border-radius:6px;padding:2px 7px;font-size:10px;color:#983028;font-weight:600}
+.gbadge{display:inline-block;background:#e0f0e0;border:none;border-radius:6px;padding:2px 7px;font-size:10px;color:#1a7a3a;font-weight:600}
+.rbadge{display:inline-block;border:none;border-radius:999px;padding:1px 8px;font-size:9.5px;font-weight:600;margin-right:6px;letter-spacing:.01em;vertical-align:middle}
+.ronde-divider{display:flex;align-items:center;gap:10px;margin:6px 4px;padding:0}
+.ronde-divider::before,.ronde-divider::after{content:"";flex:1;height:1px;background:#d5e0d0}
+.ronde-divider span{display:inline-block;font-size:9.5px;font-weight:600;padding:2px 10px;border-radius:999px;letter-spacing:.02em;white-space:nowrap}
+.lb-wrap{display:flex;align-items:center;gap:6px}
+.lb-ok{display:inline-block;background:#e0f0e0;color:#1a7a3a;border:1px solid #80c080;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;position:relative;cursor:help;white-space:nowrap}
+.lb-ok:hover .lb-tt{display:block}
+.lb-warn{display:inline-block;background:#fef5e0;color:#b87820;border:1px solid #e0c080;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;cursor:help;position:relative;white-space:nowrap}
+.lb-warn:hover .lb-tt{display:block}
+.lb-krit{display:inline-block;background:#f8e0dd;color:#b84030;border:1px solid #e08080;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;cursor:help;position:relative;white-space:nowrap}
+.lb-krit:hover .lb-tt{display:block}
+.lb-pauze{display:inline-block;background:#e0eef5;color:#3d6a8a;border:1px solid #a0c8d8;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;cursor:help;position:relative;white-space:nowrap}
+.lb-pauze:hover .lb-tt{display:block}
+.lb-tt{display:none;position:absolute;bottom:calc(100%+6px);left:50%;transform:translateX(-50%);background:#f8faf5;border-radius:8px;padding:10px 14px;font-size:11px;color:#1a2f1a;min-width:280px;max-width:400px;max-height:350px;overflow-y:auto;white-space:normal;z-index:999;box-shadow:0 6px 20px rgba(26,47,26,0.15);line-height:1.6;font-weight:400;border:1px solid #c5d5c0}
+.lb-tt::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#c5d5c0}
+.lb-tt::-webkit-scrollbar{width:3px}
+.lb-tt::-webkit-scrollbar-thumb{background:#c5d5c0;border-radius:3px}
+.lb-tt .ronde-check{display:inline-block;width:16px;height:16px;border-radius:3px;margin:0 2px;font-size:9px;text-align:center;line-height:16px;font-weight:700}
+.ronde-done{background:#e0f0e0;color:#1a7a3a;border:1px solid #80c080}
+.ronde-miss{background:#f8e0dd;color:#b84030;border:1px solid #e08080}
+.ronde-info{display:flex;align-items:center;gap:4px;margin:1px 0;font-size:10px}
+.ronde-info span{font-weight:600}
+.lb-shop-row{border-bottom:1px solid #e8f0e0;padding:3px 0}
+.lb-shop-row:last-child{border-bottom:none}
+#copyright{text-align:center;padding:4px 24px 2px;font-size:8px;color:#b0b8a8;background:#f5f7f0;opacity:0.7}
+@media print{body{background:#fff!important;color:#000!important}#topbar,#mainnav,#shiftbar,#lb,#st,#ab,#ub,#live-view,#data-waarschuwing,#copyright{display:none!important}#report-view{display:block!important;padding:0}.rep-btn{display:none!important}.rep-section{border:1px solid #ccc!important;background:#fff!important;break-inside:avoid}.rep-sh{background:#f5f5f5!important}.rep-sh h3,.rsn,.rep-table td{color:#000!important}.rep-table th{color:#333!important;border-bottom:1px solid #ccc!important}@page{margin:1.5cm;size:A4}}
+input[type=date],input[type=file]{color-scheme:light}
+.lr-winkel{padding:4px 8px;font-size:10px;border-bottom:1px solid #e0e8da;display:flex;align-items:center;gap:6px}
+.lr-winkel:last-child{border-bottom:none}
+.lr-wname{flex:1;font-weight:500;font-size:10px}
+.ronde-status-bar{display:flex;gap:4px;flex-wrap:wrap;align-items:center;padding:2px 9px 4px;border-bottom:1px solid #e0e8da;font-size:9px;color:#5a7a5a}
+.ronde-status-dot{display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:600}
+.rsd-done{background:#e0f0e0;color:#1a7a3a}
+.rsd-active{background:#fef5e0;color:#b87820;animation:pulse 2s infinite}
+.rsd-wait{background:#f0f2eb;color:#8a9a8a}
+.klant-check-cat{display:inline-block;padding:8px 16px;margin:4px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;border:2px solid transparent;transition:all .15s}
+.klant-check-cat:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+.klant-check-cat.active{border-color:#1a2f1a}
+</style>
+</head>
+<body>
+<div id="topbar"><div><h1>📊 Scan Route Dashboard — Renewi</h1><div class="sub" id="subtitle">Upload een CSV-bestand om te beginnen</div></div><div id="ct"><label>Route:<select id="rf"><option value="all">Alle routes</option></select></label><label>Dienst:<select id="sf"><option value="all">Alle diensten</option><option value="ochtend">☀️ Ochtend (06:45–14:45)</option><option value="middag">🌇 Middag (14:45–22:45)</option><option value="nacht">🌙 Nacht (22:45–06:45)</option></select></label><label>Datum:<input type="date" id="df"></label><label>Drempel:<select id="th"><option value="45">45 min</option><option value="30">30 min</option><option value="60">60 min</option><option value="90">90 min</option></select></label></div></div>
+<div id="mainnav"><button class="mnb active" id="nav-live" onclick="switchView('live')">📡 Live Dashboard</button><button class="mnb" id="nav-rapport" onclick="switchView('rapport')">📈 Rapportage</button><button class="mnb" id="nav-sample" onclick="switchView('sample')">🎲 Steekproef</button><button class="mnb" id="nav-eco" onclick="switchView('eco')">🔄 EcoSmart import</button></div>
+<div id="live-view" style="display:block">
+<div id="shiftbar"><span class="shb och" id="sb-och">☀️ Ochtend 06:45–14:45</span><span class="shb mid" id="sb-mid">🌇 Middag 14:45–22:45</span><span class="shb nac" id="sb-nac">🌙 Nacht 22:45–06:45</span><span id="current-ronde" style="display:none;align-items:center;gap:4px;margin-left:auto;font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid #c5d5c0;background:#f0f2eb;color:#1a2f1a"></span></div>
+<div id="data-waarschuwing"><span id="data-waarschuwing-text"></span><button onclick="naarVandaag()">📅 Schakel naar vandaag</button></div>
+<div id="lb"><span class="lg"><span class="ld" style="background:#1a7a3a"></span>Lounge 1 (1118)</span><span class="lg"><span class="ld" style="background:#8a6a10"></span>Lounge 2 (2228)</span><span class="lg"><span class="ld" style="background:#3a6088"></span>Lounge 3 (3338)</span><span class="lg"><span class="ld" style="background:#5a2d88"></span>Plaza (4448)</span><span class="lg"><span class="ld" style="background:#983028"></span>Nacht (5558)</span><span class="lg"><span class="ld" style="background:#1a6888"></span>KLM (6668)</span><span class="lg"><span class="ld" style="background:#6a3d8a"></span>Steekproef (9999)</span><span class="lg"><span class="ld" style="background:#2d6a2d"></span>Pauze</span></div>
+<div id="st"><div class="sv clickable" id="kpi-routes" onclick="toggleRouteStatus()"><span class="kpi-icon">🚦</span><div class="kpi-body"><div class="sn blue" id="sr2">—</div><div class="sl">Routes aan het scannen</div><div class="kpi-sub" id="routes-detail"></div></div></div><div class="sv clickable" id="kpi-scans" onclick="toggleScanDetail()"><span class="kpi-icon">📊</span><div class="kpi-body"><div class="sn" id="ss">—</div><div class="sl">Aantal scans</div><div class="kpi-sub" id="scans-detail"></div></div></div><div class="sv clickable" id="kpi-alerts" onclick="toggleAlertDetail()"><span class="kpi-icon">⚠️</span><div class="kpi-body"><div class="sn red" id="sa">—</div><div class="sl">Alerts</div><div class="kpi-sub" id="alerts-detail"></div></div></div><div class="sv clickable" id="kpi-checks" onclick="toggleKlantChecks()"><span class="kpi-icon">✅</span><div class="kpi-body"><div class="sn" style="color:#6a3d8a" id="schecks">—</div><div class="sl">Klant Checks</div><div class="kpi-sub" id="checks-detail"></div></div></div><div class="sv clickable" id="kpi-notes" onclick="toggleNoteDetail()"><span class="kpi-icon">📝</span><div class="kpi-body"><div class="sn purple" id="snotes">—</div><div class="sl">Opmerkingen</div><div class="kpi-sub" id="notes-detail"></div></div></div></div>
+<div id="ab"><div class="at">⚠️ Reistijd overschrijding gedetecteerd</div><div class="allist" id="al"></div></div>
+<div id="rg"><div style="grid-column:1/-1;padding:40px;text-align:center;color:#6a8a6a">📂 Upload een CSV-bestand hieronder om te beginnen</div></div></div>
+<div id="sample-view" style="display:none;padding:18px 24px"></div>
+<div id="eco-view" style="display:none;padding:18px 24px"></div>
+<div id="report-view" style="display:none"><div id="rep-ctrl"><label>Periode:<select id="rep-period"><option value="day">Dag</option><option value="week">Week</option><option value="month" selected>Maand</option></select></label><label id="rep-month-wrap">Maand:<select id="rep-month"></select></label><label id="rep-week-wrap" style="display:none">Week:<select id="rep-week"></select></label><label id="rep-day-wrap" style="display:none">Dag:<select id="rep-day"></select></label><label>Route:<select id="rep-route"><option value="all">Alle routes</option></select></label><button class="rep-btn primary" onclick="renderReport()">🔄 Vernieuwen</button><button class="rep-btn" onclick="exportCSV()">📥 CSV exporteren</button><button class="rep-btn" onclick="window.print()">🖨 PDF afdrukken</button></div><div id="rep-content"><p style="color:#6a8a6a;font-size:12px;padding:20px">📂 Upload eerst een CSV-bestand om de rapportage te genereren.</p></div></div>
+<div id="ub"><label for="fu">📁 CSV uploaden: <input type="file" id="fu" accept=".csv,.CSV,.xlsx,.xls"></label><span style="color:#c5d5c0;margin:0 4px">|</span><label for="curl" style="display:flex;align-items:center;gap:6px">🔗 <span>URL:</span><input type="text" id="curl" placeholder="CSV-URL (Google Sheets publish, OneDrive, ...)" style="width:340px;font-size:11px;padding:5px 8px;border:1px solid #c5d5c0;border-radius:6px"></label><button id="cbtn" type="button" style="padding:5px 12px;border-radius:6px;border:1px solid #c5d5c0;background:#3d6a8a;color:#fff;font-weight:500;font-size:11px;cursor:pointer">🔗 Verbind</button><label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#5a7a5a;cursor:pointer"><input type="checkbox" id="cauto" style="margin:0"> 🔄 Auto-vernieuw</label><select id="cint" style="padding:4px 8px;border-radius:6px;border:1px solid #c5d5c0;font-size:11px"><option value="30">30 sec</option><option value="60" selected>1 min</option><option value="300">5 min</option><option value="900">15 min</option><option value="1800">30 min</option></select><span style="color:#c5d5c0;margin:0 4px">|</span><button id="msbtn" type="button" style="padding:5px 12px;border-radius:6px;border:1px solid #c5d5c0;background:#fff;color:#1a2f1a;font-weight:500;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 23 23"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg>Microsoft</button><button id="msconf" type="button" title="Graph API instellingen" style="padding:5px 9px;border-radius:6px;border:1px solid #c5d5c0;background:#fff;color:#5a7a5a;font-size:11px;cursor:pointer">⚙</button><span id="cstat" style="font-size:11px;color:#6a8a6a;margin-left:auto"></span><span id="lu"></span></div>
+<div id="copyright">© Ronald Scholten met hulp van Sonny Koenen — editie juli 2026</div>
+<div id="msmodal" style="display:none;position:fixed;inset:0;background:rgba(26,47,26,0.5);z-index:100;align-items:center;justify-content:center"><div style="background:#f8faf5;border-radius:14px;padding:28px;max-width:560px;width:90%;box-shadow:0 24px 48px rgba(0,0,0,.2);border:1px solid #c5d5c0"><h2 style="margin:0 0 6px;font-size:18px;font-weight:700;color:#1a2f1a">🔐 Microsoft Graph API verbinding</h2><p style="margin:0 0 18px;font-size:12px;color:#5a7a5a">Vereist eenmalige app-registratie in Azure AD. <a href="#" id="msinfo" style="color:#3d6a8a">Hoe?</a></p><div style="display:flex;flex-direction:column;gap:12px"><label style="display:block;font-size:12px;font-weight:500;color:#1a2f1a"><span style="display:block;margin-bottom:4px">Client ID</span><input type="text" id="mscid" placeholder="00000000-0000-0000-0000-000000000000" style="width:100%;padding:8px 10px;border:1px solid #c5d5c0;border-radius:8px;font-family:monospace;font-size:12px;background:#f8faf5"></label><label style="display:block;font-size:12px;font-weight:500;color:#1a2f1a"><span style="display:block;margin-bottom:4px">Tenant ID</span><input type="text" id="mstid" placeholder="common" value="common" style="width:100%;padding:8px 10px;border:1px solid #c5d5c0;border-radius:8px;font-family:monospace;font-size:12px;background:#f8faf5"></label><label style="display:block;font-size:12px;font-weight:500;color:#1a2f1a"><span style="display:block;margin-bottom:4px">Graph file pad</span><input type="text" id="msurl" placeholder="/users/.../Documents/file.xlsx:/content" style="width:100%;padding:8px 10px;border:1px solid #c5d5c0;border-radius:8px;font-family:monospace;font-size:11px;background:#f8faf5"></label></div><div id="msinfobox" style="display:none;margin-top:14px;padding:14px;background:#e8f0f0;border-radius:10px;font-size:11.5px;color:#1a2f1a;line-height:1.6;border:1px solid #b0c8d0"><strong>📋 Eenmalige setup:</strong><br>1. portal.azure.com → App registrations → New registration<br>2. Redirect URI: SPA → <code id="redirurl"></code><br>3. Kopieer Client ID<br>4. API permissions → Files.Read.All + User.Read</div><div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end"><button type="button" id="mscancel" style="padding:8px 16px;border:1px solid #c5d5c0;background:#fff;color:#5a7a5a;border-radius:8px;font-weight:500;font-size:12px;cursor:pointer">Annuleren</button><button type="button" id="mssave" style="padding:8px 16px;border:none;background:#3d6a8a;color:#fff;border-radius:8px;font-weight:500;font-size:12px;cursor:pointer">💾 Opslaan & inloggen</button></div></div></div>
+<script>
+// ============ CONSTANTEN ============
+const ROUTE_COLORS={'1118':{name:'Lounge 1',color:'#1a7a3a',bg:'#e0f0e0',light:'#c8e0c8',class:'route-1118',rhClass:'rh-1118',rcClass:'rc-1118'},'2228':{name:'Lounge 2',color:'#8a6a10',bg:'#f8f0d8',light:'#f0e0b8',class:'route-2228',rhClass:'rh-2228',rcClass:'rc-2228'},'3338':{name:'Lounge 3',color:'#3a6088',bg:'#d8e8f5',light:'#c0d8e8',class:'route-3338',rhClass:'rh-3338',rcClass:'rc-3338'},'4448':{name:'Plaza',color:'#5a2d88',bg:'#e8ddf5',light:'#d8c8e8',class:'route-4448',rhClass:'rh-4448',rcClass:'rc-4448'},'5558':{name:'Nacht',color:'#983028',bg:'#f5e0dd',light:'#e8c8c0',class:'route-5558',rhClass:'rh-5558',rcClass:'rc-5558'},'6668':{name:'KLM',color:'#1a6888',bg:'#d8eef5',light:'#b8dde8',class:'route-6668',rhClass:'rh-6668',rcClass:'rc-6668'},'9999':{name:'Steekproef',color:'#6a3d8a',bg:'#f0e8f5',light:'#e0d8f0',class:'route-9999',rhClass:'',rcClass:''}};
+const SHIFTS={ochtend:{label:'☀️ Ochtend',start:6*60+45,end:14*60+45},middag:{label:'🌇 Middag',start:14*60+45,end:22*60+45},nacht:{label:'🌙 Nacht',start:22*60+45,end:6*60+45}};
+const RONDEN=[{id:1,label:'Ronde 1',start:7*60+15,end:9*60+15,shift:'ochtend',color:'#5b7fa5'},{id:2,label:'Ronde 2',start:10*60+15,end:12*60+0,shift:'ochtend',color:'#27ae60'},{id:3,label:'Ronde 3',start:12*60+0,end:14*60+10,shift:'ochtend',color:'#d4880f'},{id:4,label:'Ronde 4',start:15*60+15,end:17*60+45,shift:'middag',color:'#d4a373'},{id:5,label:'Ronde 5',start:18*60+45,end:20*60+0,shift:'middag',color:'#8b5f8a'},{id:6,label:'Ronde 6',start:20*60+0,end:22*60+10,shift:'middag',color:'#c0392b'},{id:7,label:'Ronde 7',start:0*60+0,end:4*60+0,shift:'nacht',color:'#1a7a8a'},{id:8,label:'Ronde 8',start:4*60+0,end:4*60+30,shift:'nacht',color:'#6b3a9e'},{id:9,label:'Ronde 9',start:5*60+0,end:6*60+15,shift:'nacht',color:'#a68b74'}];
+const DIENSTWISSEL_START=14*60+10;
+const DIENSTWISSEL_END=15*60+15;
+const ROUTE_ORDER=['1118','2228','3338','4448','5558','6668'];
+const PAUZE_OCHTEND_START=9*60+10;
+const PAUZE_OCHTEND_END=10*60+20;
+const PAUZE_MIDDAG_START=17*60+25;
+const PAUZE_MIDDAG_END=19*60+5;
+
+function getRouteStyle(pin){return ROUTE_COLORS[pin]||{name:'Route '+pin,color:'#5a7a5a',bg:'#f0f2eb',light:'#d5e0d0',class:'',rhClass:'',rcClass:''};}
+function getRouteButton(pin,label){var s=getRouteStyle(pin);return'<span class="route-btn '+s.class+'" style="background:'+s.bg+';color:'+s.color+';border-color:'+s.color+'">'+(label||s.name)+'</span>';}
+function getShift(ts){var m=ts.getHours()*60+ts.getMinutes();if(m>=6*60+45&&m<14*60+45)return'ochtend';if(m>=14*60+45&&m<22*60+45)return'middag';return'nacht';}
+function routeType(s){return s==='ochtend'?'dag':s==='middag'?'avond':'nacht';}
+function getRonde(ts){var m=ts.getHours()*60+ts.getMinutes();for(var i=0;i<RONDEN.length;i++){if(m>=RONDEN[i].start&&m<RONDEN[i].end)return RONDEN[i];}return null;}
+function getCurrentRonde(){return getRonde(new Date());}
+function getRondeDefById(id){return RONDEN.find(function(r){return r.id===id;});}
+function gds(d){var y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return y+'-'+m+'-'+day;}
+function getOpDate(ts){var mins=ts.getHours()*60+ts.getMinutes();if(mins<6*60+45){return gds(new Date(ts.getTime()-86400000));}return gds(ts);}
+function ft(d){return d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});}
+function toMins(s){var h=s.split(':').map(Number);return h[0]*60+h[1];}
+function norm(s){return s.toLowerCase().replace(/[^a-z0-9]/g,'');}
+function isLiftScan(shop){var n=norm(shop||'');return n.indexOf('lift1314')>=0||n.indexOf('lift-13-14')>=0;}
+function matches(a,b){var na=norm(a),nb=norm(b);if(na===nb)return true;if((na==='plazalaplaceresto'&&nb==='plazalaplacerestaurant')||(na==='plazalaplacerestaurant'&&nb==='plazalaplaceresto'))return true;if((na==='l1koffiesalonresto'&&nb==='l1koffiesalonrestaurant')||(na==='l1koffiesalonrestaurant'&&nb==='l1koffiesalonresto'))return true;var lenA=na.length,lenB=nb.length;var codeA=na.slice(0,13)+na.slice(Math.max(0,lenA-3));var codeB=nb.slice(0,13)+nb.slice(Math.max(0,lenB-3));return codeA===codeB;}
+function spansBreak(t1,t2,def){if(!def||!def.vensterStart)return false;var vS=toMins(def.vensterStart),vE=toMins(def.vensterEind);var m1=t1.getHours()*60+t1.getMinutes(),m2=t2.getHours()*60+t2.getMinutes();return m1<=vS&&m2>=vE;}
+function formatRondeEnd(r){var h=Math.floor(r.end/60),m=r.end%60;return(h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+function formatRondeTime(r){var sh=Math.floor(r.start/60),sm=r.start%60,eh=Math.floor(r.end/60),em=r.end%60;return(sh<10?'0':'')+sh+':'+(sm<10?'0':'')+sm+' - '+(eh<10?'0':'')+eh+':'+(em<10?'0':'')+em;}
+function fmtShort(d){return String(d.getDate())+'/'+String(d.getMonth()+1);}
+function addDays(d,n){var x=new Date(d.getTime());x.setDate(x.getDate()+n);return x;}
+function ri(p){return RM[p]||{name:'Route '+p,color:'#5a7a5a'};}
+function getRouteDef(pin,shift){var r=RM[pin];if(!r)return null;if(shift==='ochtend')return r.dag;if(shift==='middag')return r.avond;if(shift==='nacht')return r.nacht;return r.dag;}
+function isDienstwissel(){var m=new Date().getHours()*60+new Date().getMinutes();return m>=DIENSTWISSEL_START&&m<DIENSTWISSEL_END;}
+function isPauze(){var m=new Date().getHours()*60+new Date().getMinutes();return(m>=PAUZE_OCHTEND_START&&m<PAUZE_OCHTEND_END)||(m>=PAUZE_MIDDAG_START&&m<PAUZE_MIDDAG_END);}
+
+// ============ BADGE-FUNCTIES ============
+function getRondeProgress(pin,shift,scans){
+  var def=getRouteDef(pin,shift);if(!def||!def.ronden)return{};
+  var prog={};
+  def.ronden.forEach(function(r){
+    var winkelsInRonde=def.winkels.filter(function(w){return w.r.includes(r.id);});
+    var total=winkelsInRonde.length;
+    var done=0;
+    winkelsInRonde.forEach(function(w){var winkelScans=scans.filter(function(s){return matches(s.shop,w.n)&&!isLiftScan(s.shop);});if(winkelScans.length>0)done++;});
+    var pct=total>0?Math.round(done/total*100):0;
+    prog[r.id]={done:done,total:total,pct:pct,label:r.label,complete:pct>=96};
+  });
+  return prog;
+}
+function getWinkelRondeStatus(winkelRondes,winkelScans){
+  var sorted=winkelScans.slice().sort(function(a,b){return a.ts-b.ts;});
+  var normal=[];var used=new Set();
+  for(var i=0;i<sorted.length;i++){if(used.has(i))continue;for(var j=i+1;j<sorted.length;j++){if(used.has(j))continue;var d=Math.round((sorted[j].ts-sorted[i].ts)/60000);if(d<=30){used.add(j);}else break;}normal.push(sorted[i]);}
+  var result={};winkelRondes.forEach(function(rid){result[rid]=false;});
+  for(var i=0;i<Math.min(normal.length,winkelRondes.length);i++){result[winkelRondes[i]]=true;}
+  return result;
+}
+function buildOpenWinkelsTooltip(pin,shift,scans,rondeFilter){
+  var def=getRouteDef(pin,shift);if(!def||!def.winkels)return'';
+  var html='';
+  def.winkels.forEach(function(w){
+    var winkelScans=scans.filter(function(s){return matches(s.shop,w.n)&&!isLiftScan(s.shop);});
+    var rondeStatus=getWinkelRondeStatus(w.r,winkelScans);
+    var hasOpen=false;
+    if(rondeFilter){rondeFilter.forEach(function(rid){if(!rondeStatus[rid])hasOpen=true;});}
+    else{w.r.forEach(function(rid){if(!rondeStatus[rid])hasOpen=true;});}
+    if(!hasOpen)return;
+    html+='<div class="lb-shop-row"><div style="font-weight:500">'+w.n+'</div><div style="display:flex;gap:3px;margin-top:2px">';
+    w.r.forEach(function(rid){var rDef=getRondeDefById(rid);var lbl=rDef?rDef.label.replace('Ronde ','R'):'R'+rid;html+=rondeStatus[rid]?'<span class="ronde-check ronde-done" title="'+lbl+' gedaan">✓</span>':'<span class="ronde-check ronde-miss" title="'+lbl+' open">'+rid+'</span>';});
+    html+='</div></div>';
+  });
+  return html;
+}
+function getRouteLiveStatus(pin,scans){
+  var now=new Date();var nowMins=now.getHours()*60+now.getMinutes();
+  var defO=getRouteDef(pin,'ochtend');var defM=getRouteDef(pin,'middag');
+  var activeShift='ochtend';if(nowMins>=14*60+45&&nowMins<22*60+45)activeShift='middag';else if(nowMins>=22*60+45||nowMins<6*60+45)activeShift='nacht';
+  var def=activeShift==='ochtend'?defO:defM;if(!def||!def.ronden)return{status:'no-def'};
+  var prog=getRondeProgress(pin,activeShift,scans);var progO=getRondeProgress(pin,'ochtend',scans);
+  var currentRonde=null;
+  for(var i=0;i<def.ronden.length;i++){var r=def.ronden[i];if(nowMins>=r.start&&nowMins<r.end){currentRonde=r;break;}}
+  if(!currentRonde){for(var i=0;i<def.ronden.length-1;i++){if(nowMins>=def.ronden[i].end&&nowMins<def.ronden[i+1].start){currentRonde=def.ronden[i+1];break;}}if(!currentRonde){if(nowMins<def.ronden[0].start)currentRonde=def.ronden[0];else currentRonde=def.ronden[def.ronden.length-1];}}
+  var prevIncomplete=[];for(var i=0;i<def.ronden.length;i++){var r=def.ronden[i];if(r.id>=currentRonde.id)break;if(prog[r.id]&&!prog[r.id].complete)prevIncomplete.push(r);}
+  var lastScan=scans.length>0?scans[scans.length-1]:null;var minsSinceLastScan=lastScan?Math.round((now-lastScan.ts)/60000):999;var hasNoScans=scans.length===0;
+  var allComplete=true;if(def.ronden){def.ronden.forEach(function(r){if(prog[r.id]&&!prog[r.id].complete)allComplete=false;});}
+  var allCompleteO=true;if(defO&&defO.ronden){defO.ronden.forEach(function(r){if(progO[r.id]&&!progO[r.id].complete)allCompleteO=false;});}
+  var shiftEnd=activeShift==='ochtend'?14*60+45:22*60+45;var minsToEnd=shiftEnd-nowMins;var isEindeDienst=minsToEnd<=30&&minsToEnd>=-60;var isMiddagHelpingOchtend=(activeShift==='middag'&&!allCompleteO);
+  var status='on-schedule';var statusText='✅ Op schema';var statusCls='lb-ok';var tooltip='';
+  if(isDienstwissel()){status='wissel';statusText='🔄 Dienstwissel';statusCls='lb-warn';tooltip='<strong>Dienstwissel 14:10-15:15</strong><div>Ochtend draagt over naar middag.</div>';}
+  else if(isPauze()){status='pauze';statusText='⏸ Pauze';statusCls='lb-pauze';tooltip='<strong>Pauze</strong><div>De route ligt stil tijdens de pauze.</div>';}
+  else if(hasNoScans||minsSinceLastScan>60){status='no-contact';statusText='🚨 Geen contact';statusCls='lb-krit';tooltip='<strong>Meer dan 60 minuten geen scan!</strong><div>Neem contact op met medewerker.</div>';if(lastScan)tooltip+='<div style="margin-top:4px;font-size:10px">Laatste scan: '+ft(lastScan.ts)+'</div>';}
+  else if(isMiddagHelpingOchtend){status='delayed';statusCls='lb-warn';var openRonden=[];if(defO&&defO.ronden){defO.ronden.forEach(function(r){if(progO[r.id]&&!progO[r.id].complete)openRonden.push(r.id);});}statusText='⏳ Ochtend afronden'+(openRonden.length>0?' (R'+openRonden.join(',R')+')':'');tooltip='<strong>Middag rondt ochtend af</strong>';tooltip+=buildOpenWinkelsTooltip(pin,'ochtend',scans,openRonden);}
+  else if(prevIncomplete.length>0){status='delayed';statusText='⚠️ Vertraagd (R'+prevIncomplete.map(function(r){return r.id;}).join(',R')+')';statusCls='lb-warn';tooltip='<strong>Route vertraagd!</strong>';var openRids=prevIncomplete.map(function(r){return r.id;});tooltip+=buildOpenWinkelsTooltip(pin,activeShift,scans,openRids);}
+  else if(allComplete&&isEindeDienst){status='completed';statusText='✅ Route voltooid';statusCls='lb-ok';tooltip='<strong>Route vandaag voltooid!</strong>';}
+  else if(allCompleteO&&activeShift==='middag'){status='ochtend-klaar';statusText='✅ Ochtend klaar';statusCls='lb-ok';}
+  else if(allComplete&&activeShift==='ochtend'){status='ochtend-klaar';statusText='✅ Ochtend klaar';statusCls='lb-ok';}
+  else if(!allComplete&&isEindeDienst){status='einde-niet-af';statusText='⚠️ Route niet voltooid';statusCls='lb-warn';tooltip='<strong>Route niet voltooid!</strong>';tooltip+=buildOpenWinkelsTooltip(pin,activeShift,scans,null);}
+  return{status:status,statusText:statusText,statusCls:statusCls,tooltip:tooltip,activeShift:activeShift,prog:prog,currentRonde:currentRonde,allComplete:allComplete,isEindeDienst:isEindeDienst};
+}
+function getRondeStatusBar(pin,shift,scans){
+  var def=getRouteDef(pin,shift);if(!def||!def.ronden)return'';
+  var prog=getRondeProgress(pin,shift,scans);var nowMins=new Date().getHours()*60+new Date().getMinutes();
+  var html='<div class="ronde-status-bar">';
+  def.ronden.forEach(function(r){var p=prog[r.id];var cls='rsd-wait';var icon='⏳';var label=r.label||('Ronde '+r.id);var pctText='—';if(p){pctText=p.pct+'%';if(p.complete){cls='rsd-done';icon='✓';}else if(nowMins>=r.start&&nowMins<r.end){cls='rsd-active';icon='●';}}else if(nowMins>=r.start&&nowMins<r.end){cls='rsd-active';icon='●';}html+='<span class="ronde-status-dot '+cls+'">'+icon+' '+label+' '+pctText+'</span>';});
+  html+='</div>';return html;
+}
+function getLastScanTimeForShop(shopName){
+  var shopScans=AD.filter(function(r){return matches(r.shop,shopName)&&!isLiftScan(r.shop);});
+  if(!shopScans.length)return null;shopScans.sort(function(a,b){return b.ts-a.ts;});return shopScans[0].ts;
+}
+function countRondeScansForWinkel(winkelRondes,winkelScans){
+  var sorted=winkelScans.slice().sort(function(a,b){return a.ts-b.ts;});var normal=[];var used=new Set();
+  for(var i=0;i<sorted.length;i++){if(used.has(i))continue;for(var j=i+1;j<sorted.length;j++){if(used.has(j))continue;var d=Math.round((sorted[j].ts-sorted[i].ts)/60000);if(d<=30){used.add(j);}else break;}normal.push(sorted[i]);}
+  var count=0;var rIdx=0;while(rIdx<winkelRondes.length&&count<normal.length){count++;rIdx++;}return count;
+}
+function countRondeScansForDef(def,scans){
+  if(!def||!def.winkels)return 0;var total=0;
+  def.winkels.forEach(function(w){var winkelScans=scans.filter(function(s){return matches(s.shop,w.n)&&!isLiftScan(s.shop);});total+=countRondeScansForWinkel(w.r,winkelScans);});
+  return total;
+}
+
+// ============ ROUTE DEFINITIES ============
+const RM = {
+  '1118': {
+    name:'Lounge 1', color:'#1a7a3a',
+    dag: {
+      label:'☀ Ochtend 06:45-14:45',
+      pauzeStart:'09:30', pauzeEind:'10:00', vensterStart:'09:15', vensterEind:'10:15',
+      pTekst:'// Pauze 09:30-10:00  |  Venster: 09:15-10:15',
+      ronden:[{id:1,tijd:'07:15-09:15'},{id:2,tijd:'10:15-12:00'},{id:3,tijd:'12:00-14:10'}],
+      winkels:[{n:'B-pier-Dammers-Tap',r:[1,2]},{n:'B-pier-Grab-Fly',r:[1,2]},{n:'B-pier-Karton-Verzamelpunt',r:[1,2,3]},{n:'B-pier-Kiosk-29',r:[1,2]},{n:'B-pier-Kiosk-koffiepunt',r:[1,2]},{n:'B-pier-Koffiesalon-Car',r:[1,2]},{n:'C-pier-Comunal',r:[1,2,3]},{n:'C-pier-Karton-Verzamelpunt',r:[1,2,3]},{n:'C-pier-Kiosco',r:[1,2]},{n:'C-pier-Starbucks',r:[1,2]},{n:'C-pier-Grab-Fly',r:[1,2]},{n:'L1-Privium-South',r:[1,2,3]},{n:'L1-Deli-Salon',r:[1,2,3]},{n:'L1-Eataly',r:[1,2,3]},{n:'L1-Koekemannetje',r:[1,2]},{n:'L1-Koffiesalon-Resto',r:[1,2,3]},{n:'L1-LOAF',r:[1,2,3]},{n:'L1-Starbucks',r:[1,2,3]},{n:'L1-Burger-King',r:[1,2,3]},{n:'L1-De-Bar',r:[1,2]},{n:'L1-La-Place',r:[1,2,3]},{n:'L1-Leon',r:[1,2]},{n:'L1-The-Wanderer',r:[1,2]},{n:'L1-Two-Tigers',r:[1,2]}]
+    },
+    avond: {
+      label:'◐ Middag 14:45-22:45',
+      pauzeStart:'17:45', pauzeEind:'18:45', vensterStart:'17:30', vensterEind:'19:00',
+      pTekst:'// Pauze 17:45-18:45  |  Venster: 17:30-19:00',
+      ronden:[{id:4,tijd:'15:15-17:45'},{id:5,tijd:'18:45-20:15'},{id:6,tijd:'20:15-22:15'}],
+      winkels:[{n:'B-pier-Dammers-Tap',r:[4,5]},{n:'B-pier-Grab-Fly',r:[4,5]},{n:'B-pier-Karton-Verzamelpunt',r:[4,5]},{n:'B-pier-Kiosk-29',r:[4,5]},{n:'B-pier-Kiosk-koffiepunt',r:[4,5]},{n:'B-pier-Koffiesalon-Car',r:[4]},{n:'C-pier-Comunal',r:[4,5]},{n:'C-pier-Karton-Verzamelpunt',r:[4,5]},{n:'C-pier-Kiosco',r:[4]},{n:'C-pier-Starbucks',r:[4]},{n:'C-pier-Grab-Fly',r:[4,5]},{n:'L1-Privium-South',r:[4,5]},{n:'L1-Deli-Salon',r:[4,5,6]},{n:'L1-Eataly',r:[4,5]},{n:'L1-Koekemannetje',r:[4,5]},{n:'L1-Koffiesalon-Resto',r:[4,5,6]},{n:'L1-LOAF',r:[4,5]},{n:'L1-Starbucks',r:[4,5,6]},{n:'L1-Burger-King',r:[4,5,6]},{n:'L1-De-Bar',r:[4,5]},{n:'L1-La-Place',r:[4,5]},{n:'L1-Leon',r:[4,5]},{n:'L1-The-Wanderer',r:[4,5]},{n:'L1-Two-Tigers',r:[4,5]}]
+    },
+    nacht: {
+      label:'☾ Nacht 22:45-06:45',
+      pauzeStart:'02:30', pauzeEind:'03:00', vensterStart:'02:15', vensterEind:'03:15',
+      pTekst:'// Pauze 02:30-03:00  |  Venster: 02:15-03:15',
+      ronden:[{id:7,tijd:'22:45-04:00'},{id:8,tijd:'04:00-04:30'},{id:9,tijd:'05:00-06:15'}],
+      winkels:[]
+    }
+  },
+  '2228': {
+    name:'Lounge 2', color:'#8a6a10',
+    dag: {
+      label:'☀ Ochtend 06:45-14:45',
+      pauzeStart:'09:30', pauzeEind:'10:00', vensterStart:'09:15', vensterEind:'10:15',
+      pTekst:'// Pauze 09:30-10:00  |  Venster: 09:15-10:15',
+      ronden:[{id:1,tijd:'07:15-09:15'},{id:2,tijd:'10:15-12:00'},{id:3,tijd:'12:00-14:10'}],
+      winkels:[{n:'D-pier-Cafe-Flor',r:[1]},{n:'D-pier-Harvest-Market',r:[1,2]},{n:'D-pier-Heineken-Bar',r:[1]},{n:'D-pier-Murphy\'s-Pub',r:[1]},{n:'D-pier-Starbucks',r:[1]},{n:'D-pier-Grab-Fly',r:[1,2]},{n:'L1-Aspire-26',r:[1,2,3]},{n:'L1-Park-Cafe',r:[1,2]},{n:'L1-Privium-28',r:[1,2]},{n:'L2-Bubbles',r:[1]},{n:'L2-Gucci',r:[1]},{n:'L2-Louis-Vuitton',r:[1]},{n:'L2-Amsterdam-Bread-Company',r:[1,2,3]},{n:'L2-Aspire-41',r:[1,2,3]},{n:'L2-Frames',r:[1]},{n:'L2-Starbucks',r:[1,2,3]},{n:'L2-Lavazza',r:[1]},{n:'L2-MCDonalds',r:[1,2,3]},{n:'L2-Streetfood-the-oven-the-grill',r:[1,2]},{n:'L2-Sushi-',r:[1,2]}]
+    },
+    avond: {
+      label:'◐ Middag 14:45-22:45',
+      pauzeStart:'17:45', pauzeEind:'18:45', vensterStart:'17:30', vensterEind:'19:00',
+      pTekst:'// Pauze 17:45-18:45  |  Venster: 17:30-19:00',
+      ronden:[{id:4,tijd:'15:15-17:45'},{id:5,tijd:'18:45-20:15'},{id:6,tijd:'20:15-22:15'}],
+      winkels:[{n:'D-pier-Cafe-Flor',r:[4]},{n:'D-pier-Harvest-Market',r:[4,5]},{n:'D-pier-Heineken-Bar',r:[4,5]},{n:'D-pier-Murphy\'s-Pub',r:[4,5]},{n:'D-pier-Stach',r:[4]},{n:'D-pier-Starbucks',r:[4,5]},{n:'D-pier-Grab-Fly',r:[4,5]},{n:'L1-Aspire-26',r:[4,5]},{n:'L1-Park-Cafe',r:[4,5]},{n:'L1-Privium-28',r:[4,5]},{n:'L2-Amsterdam-Bread-Company',r:[4,5,6]},{n:'L2-Bubbles',r:[4,5]},{n:'L2-Aspire-41',r:[4,5,6]},{n:'L2-Frames',r:[4]},{n:'L2-Starbucks',r:[4,5]},{n:'L2-Lavazza',r:[4,5]},{n:'L2-MCDonalds',r:[4,5,6]},{n:'L2-Streetfood-the-oven-the-grill',r:[4,5]},{n:'L2-Sushi-',r:[4,5]}]
+    },
+    nacht: {
+      label:'☾ Nacht 22:45-06:45',
+      pauzeStart:'02:30', pauzeEind:'03:00', vensterStart:'02:15', vensterEind:'03:15',
+      pTekst:'// Pauze 02:30-03:00  |  Venster: 02:15-03:15',
+      ronden:[{id:7,tijd:'22:45-04:00'},{id:8,tijd:'04:00-04:30'},{id:9,tijd:'05:00-06:15'}],
+      winkels:[]
+    }
+  },
+  '3338': {
+    name:'Lounge 3', color:'#3a6088',
+    dag: {
+      label:'☀ Ochtend 06:45-14:45',
+      pauzeStart:'09:30', pauzeEind:'10:00', vensterStart:'09:15', vensterEind:'10:15',
+      pTekst:'// Pauze 09:30-10:00  |  Venster: 09:15-10:15',
+      ronden:[{id:1,tijd:'07:15-09:15'},{id:2,tijd:'10:15-12:00'},{id:3,tijd:'12:00-14:10'}],
+      winkels:[{n:'E-pier-Cafe-Olea',r:[1,2]},{n:'E-pier-Silverscreen',r:[1,2]},{n:'F-pier-East-Bar',r:[1]},{n:'F-pier-Moods',r:[1,2]},{n:'F-pier-The-Butcher',r:[1]},{n:'G-pier-Karton-Verzamelpunt',r:[1,2]},{n:'G-pier-Kiosk',r:[1]},{n:'G-pier-Pana',r:[1,2]},{n:'HB-Dutch-Kitchen',r:[1,2,3]},{n:'HB-Kebaya',r:[1,2]},{n:'L2-Privium-West',r:[1,2,3]},{n:'E-pier-Grab-Fly',r:[1,2]},{n:'F-pier-Grab-Fly',r:[1,2]},{n:'G-pier-Grab-Fly',r:[1,2]},{n:'L3-Bread',r:[1,2,3]},{n:'L3-Joe-and-Juice',r:[1]},{n:'L3-MCDonalds',r:[1]},{n:'L3-Starbucks',r:[1,2]},{n:'L3-VIT',r:[1]},{n:'L4-Birra-Moretti',r:[1,2]},{n:'L4-Karton-verzamelpunt',r:[1,2]},{n:'L4-Stach',r:[1]},{n:'L4-Urban-Food-Market',r:[1,2]},{n:'L3-Amex-Lounge',r:[1,2]}]
+    },
+    avond: {
+      label:'◐ Middag 14:45-22:45',
+      pauzeStart:'17:45', pauzeEind:'18:45', vensterStart:'17:30', vensterEind:'19:00',
+      pTekst:'// Pauze 17:45-18:45  |  Venster: 17:30-19:00',
+      ronden:[{id:4,tijd:'15:15-17:45'},{id:5,tijd:'18:45-20:15'},{id:6,tijd:'20:15-22:15'}],
+      winkels:[{n:'E-pier-Cafe-Olea',r:[4]},{n:'E-pier-Silverscreen',r:[4,5]},{n:'F-pier-East-Bar',r:[4,5]},{n:'F-pier-Moods',r:[4]},{n:'F-pier-The-Butcher',r:[4]},{n:'G-pier-Karton-Verzamelpunt',r:[4,5]},{n:'G-pier-Kiosk',r:[4]},{n:'G-pier-Pana',r:[4,5]},{n:'HB-Dutch-Kitchen',r:[4,5]},{n:'HB-Kebaya',r:[4,5]},{n:'L2-Privium-West',r:[4,5]},{n:'HB-Stach-Corner',r:[4]},{n:'E-pier-Grab-Fly',r:[4,5]},{n:'F-pier-Grab-Fly',r:[4]},{n:'G-pier-Grab-Fly',r:[4,5]},{n:'L3-Bread',r:[4,5]},{n:'L3-Carluccios',r:[4]},{n:'L3-Joe-and-Juice',r:[4]},{n:'L3-MCDonalds',r:[4]},{n:'L3-Starbucks',r:[4,5]},{n:'L3-VIT',r:[4,5]},{n:'L4-Birra-Moretti',r:[4,5]},{n:'L4-Karton-verzamelpunt',r:[4,5]},{n:'L4-Stach',r:[4]},{n:'L4-Urban-Food-Market',r:[4,5]},{n:'L3-Amex-Lounge',r:[4,5]}]
+    },
+    nacht: {
+      label:'☾ Nacht 22:45-06:45',
+      pauzeStart:'02:30', pauzeEind:'03:00', vensterStart:'02:15', vensterEind:'03:15',
+      pTekst:'// Pauze 02:30-03:00  |  Venster: 02:15-03:15',
+      ronden:[{id:7,tijd:'22:45-04:00'},{id:8,tijd:'04:00-04:30'},{id:9,tijd:'05:00-06:15'}],
+      winkels:[]
+    }
+  },
+  '4448': {
+    name:'Plaza', color:'#5a2d88',
+    dag: {
+      label:'☀ Ochtend 06:45-14:45',
+      pauzeStart:'09:30', pauzeEind:'10:00', vensterStart:'09:15', vensterEind:'10:15',
+      pTekst:'// Pauze 09:30-10:00  |  Venster: 09:15-10:15',
+      ronden:[{id:1,tijd:'07:15-09:15'},{id:2,tijd:'10:15-12:00'},{id:3,tijd:'12:00-14:10'}],
+      winkels:[{n:'Plaza-Hello-Goodbye-Bar',r:[1,2]},{n:'Plaza-Starbucks-A1',r:[1]},{n:'Plaza-Urban-Beans-D1',r:[1]},{n:'Plaza-AH-to-Go-A2',r:[1,2]},{n:'Plaza-Koffiesalon-A2',r:[1]},{n:'Plaza-La-Place-Express',r:[1]},{n:'Plaza-BPS',r:[1]},{n:'Plaza-Panorama-Restaurant',r:[1]},{n:'Plaza-Privium',r:[1]},{n:'Plaza-Hema',r:[1,2]},{n:'Plaza-La-Place-Resto',r:[1,2,3]},{n:'Plaza-Albert-Heijn',r:[1,2]},{n:'Plaza-Burger-King',r:[1]},{n:'Plaza-FEBO',r:[1,2]},{n:'Plaza-Leon',r:[1,2]},{n:'Plaza - Zero-zero',r:[1,2]},{n:'Plaza-Stach',r:[1]},{n:'Plaza-Starbucks',r:[1,2,3,1]},{n:'Plaza-Douwe-Egberts-D3',r:[1,2]},{n:'Plaza-Grand-Cafe-A3',r:[1,2,3]},{n:'Plaza-Koekemannetje',r:[1,2,3]},{n:'Plaza-Up-to-do-Good/Koffiesalon',r:[1]},{n:'Plaza-Urban-Beans-A3',r:[1]},{n:'Plaza-AH-to-Go-A4',r:[1]},{n:'Plaza-Urban-Beans-D4',r:[1]}]
+    },
+    avond: {
+      label:'◐ Middag 14:45-22:45',
+      pauzeStart:'17:45', pauzeEind:'18:45', vensterStart:'17:30', vensterEind:'19:00',
+      pTekst:'// Pauze 17:45-18:45  |  Venster: 17:30-19:00',
+      ronden:[{id:4,tijd:'15:15-17:45'},{id:5,tijd:'18:45-20:15'},{id:6,tijd:'20:15-22:15'}],
+      winkels:[{n:'Plaza-Cafe-Rembrandt',r:[4]},{n:'Plaza-Hello-Goodbye-Bar',r:[4]},{n:'Plaza-Poke-Perfect-A1',r:[4]},{n:'Plaza-Starbucks-A1',r:[4]},{n:'Plaza-Urban-Beans-D1',r:[4]},{n:'Plaza-AH-to-Go-A2',r:[4,5]},{n:'Plaza-Koffiesalon-A2',r:[4]},{n:'Plaza-La-Place-Express',r:[4,5]},{n:'Plaza-BPS',r:[4,5]},{n:'Plaza-Panorama-Restaurant',r:[4,5]},{n:'Plaza-Privium',r:[4,5]},{n:'Plaza-Hema',r:[4]},{n:'Plaza-La-Place-Resto',r:[4,5]},{n:'Plaza-Wing-Stop',r:[4]},{n:'Plaza-Albert-Heijn',r:[4,5]},{n:'Plaza-Burger-King',r:[4,5]},{n:'Plaza-Crossroads',r:[4]},{n:'Plaza-FEBO',r:[4,5]},{n:'Plaza-Leon',r:[4,5]},{n:'Plaza - Zero-zero',r:[4,5]},{n:'Plaza-Stach',r:[4]},{n:'Plaza-Starbucks',r:[4,5,6]},{n:'Plaza-Douwe-Egberts-D3',r:[4]},{n:'Plaza-Grand-Cafe-A3',r:[4,5]},{n:'Plaza-Koekemannetje',r:[4,5]},{n:'Plaza-Up-to-do-Good/Koffiesalon',r:[4,5]},{n:'Plaza-Urban-Beans-A3',r:[4]},{n:'Plaza-AH-to-Go-A4',r:[4]},{n:'Plaza-Urban-Beans-D4',r:[4,5]}]
+    },
+    nacht: {
+      label:'☾ Nacht 22:45-06:45',
+      pauzeStart:'02:30', pauzeEind:'03:00', vensterStart:'02:15', vensterEind:'03:15',
+      pTekst:'// Pauze 02:30-03:00  |  Venster: 02:15-03:15',
+      ronden:[{id:7,tijd:'22:45-04:00'},{id:8,tijd:'04:00-04:30'},{id:9,tijd:'05:00-06:15'}],
+      winkels:[]
+    }
+  },
+  '5558': {
+    name:'Nacht', color:'#983028',
+    dag: {
+      label:'☀ Ochtend 06:45-14:45',
+      pauzeStart:'09:30', pauzeEind:'10:00', vensterStart:'09:15', vensterEind:'10:15',
+      pTekst:'// Pauze 09:30-10:00  |  Venster: 09:15-10:15',
+      ronden:[{id:1,tijd:'07:15-09:15'},{id:2,tijd:'10:15-12:00'},{id:3,tijd:'12:00-14:10'}],
+      winkels:[]
+    },
+    avond: {
+      label:'◐ Middag 14:45-22:45',
+      pauzeStart:'17:45', pauzeEind:'18:45', vensterStart:'17:30', vensterEind:'19:00',
+      pTekst:'// Pauze 17:45-18:45  |  Venster: 17:30-19:00',
+      ronden:[{id:4,tijd:'15:15-17:45'},{id:5,tijd:'18:45-20:15'},{id:6,tijd:'20:15-22:15'}],
+      winkels:[]
+    },
+    nacht: {
+      label:'☾ Nacht 22:45-06:45',
+      pauzeStart:'02:30', pauzeEind:'03:00', vensterStart:'02:15', vensterEind:'03:15',
+      pTekst:'// Pauze 02:30-03:00  |  Venster: 02:15-03:15',
+      ronden:[{id:7,tijd:'22:45-04:00'},{id:8,tijd:'04:00-04:30'},{id:9,tijd:'05:00-06:15'}],
+      winkels:[{n:'B-pier-Grab-Fly',r:[7]},{n:'B-pier-Karton-Verzamelpunt',r:[7]},{n:'C-pier-Comunal',r:[7]},{n:'C-pier-Karton-Verzamelpunt',r:[7]},{n:'C-pier-Grab-Fly',r:[7]},{n:'L1-Deli-Salon',r:[7]},{n:'L1-Eataly',r:[7]},{n:'D-pier-Grab-Fly',r:[7]},{n:'L1-LOAF',r:[7]},{n:'L1-Starbucks',r:[7]},{n:'L1-Burger-King',r:[7]},{n:'L1-De-Bar',r:[7]},{n:'L1-La-Place',r:[7]},{n:'L1-Park-Cafe',r:[7]},{n:'L2-Amsterdam-Bread-Company',r:[7]},{n:'L2-MCDonalds',r:[7]},{n:'L3-Bread',r:[7]},{n:'L3-Carluccios',r:[7]},{n:'Plaza-Albert-Heijn',r:[7]},{n:'Plaza-Grand-Cafe-A3',r:[7]},{n:'Plaza-La-Place-Express',r:[7]},{n:'Plaza-La-Place-Resto',r:[7]},{n:'Plaza-Starbucks',r:[7]}]
+    }
+  },
+  '6668': {
+    name:'KLM', color:'#1a6888',
+    dag: {
+      label:'☀ Ochtend 06:45-14:45',
+      pauzeStart:'09:30', pauzeEind:'10:00', vensterStart:'09:15', vensterEind:'10:15',
+      pTekst:'// Pauze 09:30-10:00  |  Venster: 09:15-10:15',
+      ronden:[{id:1,tijd:'07:15-09:15'},{id:2,tijd:'10:15-12:00'},{id:3,tijd:'12:00-14:10'}],
+      winkels:[{n:'L1-KLM-25',r:[1,2,3]},{n:'L3-KLM-52',r:[1,2,3]},{n:'L3-KLM-52-Polder',r:[1,2,3]},{n:'Plaza-VIP-center',r:[1]}]
+    },
+    avond: {
+      label:'◐ Middag 14:45-22:45',
+      pauzeStart:'17:45', pauzeEind:'18:45', vensterStart:'17:30', vensterEind:'19:00',
+      pTekst:'// Pauze 17:45-18:45  |  Venster: 17:30-19:00',
+      ronden:[{id:4,tijd:'15:15-17:45'},{id:5,tijd:'18:45-20:15'},{id:6,tijd:'20:15-22:15'}],
+      winkels:[{n:'L1-KLM-25',r:[4,5]},{n:'L3-KLM-52',r:[4,5,6]},{n:'L3-KLM-52-Polder',r:[4]},{n:'Plaza-VIP-center',r:[4]}]
+    },
+    nacht: {
+      label:'☾ Nacht 22:45-06:45',
+      pauzeStart:'02:30', pauzeEind:'03:00', vensterStart:'02:15', vensterEind:'03:15',
+      pTekst:'// Pauze 02:30-03:00  |  Venster: 02:15-03:15',
+      ronden:[{id:7,tijd:'22:45-04:00'},{id:8,tijd:'04:00-04:30'},{id:9,tijd:'05:00-06:15'}],
+      winkels:[]
+    }
+  },
+  '9999': { name:'Controle (steekproef)', color:'#dc2626', dag:{label:'Controle', pTekst:'', ronden:[], winkels:[]}, avond:{label:'Controle', pTekst:'', ronden:[], winkels:[]}, nacht:{label:'Controle', pTekst:'', ronden:[], winkels:[]} }
+};
+
+// ============ SAMENVOEGING CHECKLISTS ============
+function mergeShiftsForChecklist(pin){
+  var defO=RM[pin]?RM[pin].dag:null;var defM=RM[pin]?RM[pin].avond:null;if(!defO&&!defM)return null;
+  var wMap={};
+  if(defO&&defO.winkels){defO.winkels.forEach(function(w){var k=w.n;if(!wMap[k])wMap[k]={name:w.n,rondes:[]};w.r.forEach(function(rid){if(wMap[k].rondes.indexOf(rid)<0)wMap[k].rondes.push(rid);});});}
+  if(defM&&defM.winkels){defM.winkels.forEach(function(w){var k=w.n;if(!wMap[k])wMap[k]={name:w.n,rondes:[]};w.r.forEach(function(rid){if(wMap[k].rondes.indexOf(rid)<0)wMap[k].rondes.push(rid);});});}
+  var mWinkels=[];Object.keys(wMap).forEach(function(k){var w=wMap[k];w.rondes.sort(function(a,b){return a-b;});mWinkels.push({n:w.name,r:w.rondes});});mWinkels.sort(function(a,b){return a.n.localeCompare(b.n);});
+  var mRondes=[];var seen={};function addR(rr){if(!rr)return;rr.forEach(function(r){if(!seen[r.id]){seen[r.id]=true;mRondes.push(r);}});}
+  addR(defO?defO.ronden:null);addR(defM?defM.ronden:null);mRondes.sort(function(a,b){return a.id-b.id;});
+  var pauze=[];if(defO&&defO.pTekst)pauze.push('Ochtend: '+defO.pTekst);if(defM&&defM.pTekst)pauze.push('Middag: '+defM.pTekst);
+  return{ronden:mRondes,winkels:mWinkels,pTekst:pauze.join(' | ')};
+}
+function getTimingStatus(scanMins,rDef){if(!rDef)return'empty';var s=rDef.start,e=rDef.end;if(scanMins>=s&&scanMins<=e)return'green';if(scanMins<s){var d=s-scanMins;return d<=60?'orange':'red';}if(scanMins>e){var d=scanMins-e;return d<=60?'orange':'red';}return'green';}
+function assignScansToRondesMerged(winkelRondes,winkelScans){
+  var sorted=winkelScans.slice().sort(function(a,b){return a.ts-b.ts;});var extra=[];var normal=[];var used=new Set();
+  for(var i=0;i<sorted.length;i++){if(used.has(i))continue;for(var j=i+1;j<sorted.length;j++){if(used.has(j))continue;var d=Math.round((sorted[j].ts-sorted[i].ts)/60000);if(d<=30){extra.push(sorted[j]);used.add(j);}else break;}normal.push(sorted[i]);}
+  var asgn={};winkelRondes.forEach(function(rid){asgn[rid]={scan:null,status:'empty'};});
+  var sIdx=0;var rIdx=0;
+  while(sIdx<normal.length&&rIdx<winkelRondes.length){var rid=winkelRondes[rIdx];var rDef=getRondeDefById(rid);if(!rDef){rIdx++;continue;}var scan=normal[sIdx];var sm=scan.ts.getHours()*60+scan.ts.getMinutes();asgn[rid]={scan:scan,status:getTimingStatus(sm,rDef),scanMins:sm};sIdx++;rIdx++;}
+  while(sIdx<normal.length){extra.push(normal[sIdx]);sIdx++;}
+  return{assignments:asgn,extraScans:extra};
+}
+function renderRondeSlot(asgn,rid){
+  var rDef=getRondeDefById(rid);var lbl=rDef?rDef.label:'R'+rid;var a=asgn[rid];
+  if(!a||a.status==='empty')return'<span class="scan-time-badge scan-time-empty" title="'+lbl+': nog niet gescand">'+rid+'</span>';
+  var scan=a.scan;var t=ft(scan.ts);var cls='scan-time-green';var tip=lbl+': gescand om '+t;var icon='';
+  if(a.status==='orange'){cls='scan-time-orange';var sm=a.scanMins;if(rDef&&sm<rDef.start){var d=rDef.start-sm;tip=lbl+': '+d+' min te vroeg ('+t+')';icon=' ⚡';}else if(rDef&&sm>rDef.end){var d=sm-rDef.end;tip=lbl+': '+d+' min te laat ('+t+')';icon=' ⏰';}}
+  else if(a.status==='red'){cls='scan-time-red';var sm=a.scanMins;if(rDef&&sm<rDef.start){var d=rDef.start-sm;tip=lbl+': '+d+' min te vroeg ('+t+') ⚠️';icon=' ⚡';}else if(rDef&&sm>rDef.end){var d=sm-rDef.end;tip=lbl+': '+d+' min te laat ('+t+') ⚠️';icon=' ⏰';}}
+  else{tip=lbl+': op tijd ('+t+')';icon=' ✓';}
+  if(scan.note)tip+=' | 💬 '+scan.note;
+  return'<span class="scan-time-badge '+cls+'" title="'+tip+'">⏱ '+t+icon+'</span>';
+}
+function renderExtraScanBadge(scan){var t=ft(scan.ts);var r=getRonde(scan.ts);var ri=r?' in '+r.label:'';var nh=scan.note?' | 💬 '+scan.note:'';return'<span class="scan-time-badge scan-time-orange" title="Extra scan'+ri+' om '+t+nh+'" style="cursor:help;border-style:dashed;background:#f0e8f5;color:#6a3d8a;border-color:#b8a0d0">'+t+' +</span>';}
+
+// ============ DATA VERWERKING ============
+var AD=[];
+function parse(txt){try{txt=txt.replace(/\r\n/g,'\n').replace(/\r/g,'\n');var lines=txt.trim().split('\n');if(lines.length<2)return[];var header=lines[0];var delim=header.split(';').length>header.split(',').length?';':',';function pLine(l){var res=[],cur='',inQ=false;for(var i=0;i<l.length;i++){var c=l[i];if(c==='"'){inQ=!inQ;}else if(c===delim&&!inQ){res.push(cur.trim());cur='';}else cur+=c;}res.push(cur.trim());return res;}var hdr=pLine(header.toLowerCase());var iTs=hdr.findIndex(function(h){return h.indexOf('tijdstip')>=0||h.indexOf('time')>=0||h.indexOf('datum')>=0;});var iShop=hdr.findIndex(function(h){return h.indexOf('winkel')>=0||h.indexOf('naam')>=0;});var iPin=hdr.findIndex(function(h){return h.indexOf('pincode')>=0||h.indexOf('pin')>=0;});var iNote=hdr.findIndex(function(h){return h.indexOf('opmerking')>=0||h.indexOf('note')>=0;});if(iTs<0)iTs=0;if(iShop<0)iShop=1;if(iPin<0)iPin=2;if(iNote<0)iNote=3;var rows=[],buf='',opens=0;for(var i=1;i<lines.length;i++){var l=lines[i];for(var j=0;j<l.length;j++)if(l[j]==='"')opens++;buf=buf?buf+' '+l:l;if(opens%2===0){if(buf.trim())rows.push(buf);buf='';opens=0;}}if(buf.trim())rows.push(buf);var VALID={'1118':1,'2228':1,'3338':1,'4448':1,'5558':1,'6668':1,'668':1,'9999':1,'999':1};var result=[];for(var i=0;i<rows.length;i++){var p=pLine(rows[i]);if(p.length<3)continue;var rawTs=p[iTs].replace(/"/g,'').trim();var ts=new Date(rawTs);if(isNaN(ts.getTime())){var m=rawTs.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);if(m)ts=new Date(m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2)+'T'+(m[4]||'00')+':'+(m[5]||'00')+':'+(m[6]||'00'));}if(!ts||isNaN(ts.getTime()))continue;var shop=p[iShop].replace(/"/g,'').trim();var pin=p[iPin].replace(/"/g,'').trim();if(pin==='999')pin='9999';if(pin==='668')pin='6668';var note=(p[iNote]||'').replace(/"/g,'').trim();if(!shop||!VALID[pin])continue;result.push({ts:ts,shop:shop,pin:pin,note:note});}return result;}catch(e){console.error('Parse error:',e);return[];}}
+function getFilteredData(){var df=document.getElementById('df').value;var sf=document.getElementById('sf').value;var data=df?AD.filter(function(r){return getOpDate(r.ts)===df&&!isLiftScan(r.shop);}):AD.filter(function(r){return!isLiftScan(r.shop);});if(sf!=='all')data=data.filter(function(r){return getShift(r.ts)===sf;});return data;}
+function getActiveRoutes(){var byR={};var data=getFilteredData();data.forEach(function(r){if(r.pin==='9999')return;if(!byR[r.pin])byR[r.pin]={pin:r.pin,scans:[]};byR[r.pin].scans.push(r);});Object.keys(byR).forEach(function(k){byR[k].scans.sort(function(a,b){return a.ts-b.ts;});});return byR;}
+function buildShopRouteMap(){var map={};Object.keys(RM).forEach(function(pin){['dag','avond','nacht'].forEach(function(sh){var def=RM[pin][sh];if(!def||!def.winkels)return;def.winkels.forEach(function(w){var key=norm(w.n);if(!map[key])map[key]=[];map[key].push({pin:pin,shift:sh,name:w.n});});});});return map;}
+var SHOP_ROUTE_MAP=null;
+function reassignPinsByShopName(scans){if(!SHOP_ROUTE_MAP)SHOP_ROUTE_MAP=buildShopRouteMap();var reassigned=0;scans.forEach(function(scan){if(scan.pin==='9999')return;var shift=getShift(scan.ts);var shiftType=routeType(shift);var origDef=RM[scan.pin]&&RM[scan.pin][shiftType];var origHasShop=origDef&&origDef.winkels&&origDef.winkels.some(function(w){return matches(scan.shop,w.n);});if(origHasShop)return;var candidates=new Set();Object.keys(RM).forEach(function(pin){if(pin===scan.pin)return;var d=RM[pin][shiftType];if(d&&d.winkels&&d.winkels.some(function(w){return matches(scan.shop,w.n);})){candidates.add(pin);}});if(candidates.size===1){var newPin=Array.from(candidates)[0];scan.originalPin=scan.pin;scan.pin=newPin;reassigned++;}});if(reassigned>0)console.log('Pin-correctie:',reassigned,'scans');return reassigned;}
+function calculateExpectedByShift(pin,dataForRoute){
+  var result={ochtend:{scans:0,expected:0},middag:{scans:0,expected:0},nacht:{scans:0,expected:0}};if(!dataForRoute||!dataForRoute.length)return result;
+  var byOpDateShift={};dataForRoute.forEach(function(s){if(isLiftScan(s.shop))return;var opd=getOpDate(s.ts);var sh=getShift(s.ts);var key=opd+'|'+sh;if(!byOpDateShift[key])byOpDateShift[key]=[];byOpDateShift[key].push(s);});
+  Object.keys(byOpDateShift).forEach(function(key){var parts=key.split('|');var sh=parts[1];var scans=byOpDateShift[key];var def=getRouteDef(pin,sh);if(def&&def.winkels){result[sh].expected+=def.winkels.reduce(function(s,w){return s+w.r.length;},0);}result[sh].scans+=scans.length;});
+  return result;
+}
+
+function updateKPIValues(){
+  var data=getFilteredData();var routes=getActiveRoutes();var routeKeys=Object.keys(routes);var sf=document.getElementById('sf').value;var df=document.getElementById('df').value;
+  var now=new Date();var threshold=30;var activeCount=0;
+  routeKeys.forEach(function(pin){var info=routes[pin];if(!info||!info.scans.length)return;var lastScan=info.scans[info.scans.length-1];var minutesSince=Math.round((now-lastScan.ts)/60000);if(minutesSince<threshold)activeCount++;});
+  document.getElementById('sr2').textContent=activeCount+'/'+routeKeys.length;
+  document.getElementById('routes-detail').textContent=activeCount+' van '+routeKeys.length+' routes actief';
+  var totalOchtendScans=0,totalOchtendExp=0,totalMiddagScans=0,totalMiddagExp=0,totalNachtScans=0,totalNachtExp=0;
+  routeKeys.forEach(function(pin){var info=routes[pin];if(!info||!info.scans.length)return;var exp=calculateExpectedByShift(pin,info.scans);totalOchtendScans+=exp.ochtend.scans;totalOchtendExp+=exp.ochtend.expected;totalMiddagScans+=exp.middag.scans;totalMiddagExp+=exp.middag.expected;totalNachtScans+=exp.nacht.scans;totalNachtExp+=exp.nacht.expected;});
+  var ochtendPct=totalOchtendExp>0?Math.round(totalOchtendScans/totalOchtendExp*100):0;
+  var middagPct=totalMiddagExp>0?Math.round(totalMiddagScans/totalMiddagExp*100):0;
+  var nachtPct=totalNachtExp>0?Math.round(totalNachtScans/totalNachtExp*100):0;
+  var datumText=df?df:'Alle data';
+  if(sf==='all'){document.getElementById('ss').innerHTML='<div style="text-align:center;font-size:15px;font-weight:700;color:#1a2f1a">'+(totalOchtendScans+totalMiddagScans+totalNachtScans)+'/'+(totalOchtendExp+totalMiddagExp+totalNachtExp)+'</div>';document.getElementById('scans-detail').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px"><span>☀️ Ochtend '+totalOchtendScans+'/'+totalOchtendExp+' ('+ochtendPct+'%)</span><span>🌇 Middag '+totalMiddagScans+'/'+totalMiddagExp+' ('+middagPct+'%)</span><span>🌙 Nacht '+totalNachtScans+'/'+totalNachtExp+' ('+nachtPct+'%)</span><span style="text-align:right;width:100%;font-size:8px;margin-top:2px;color:#8a9a8a">📅 '+datumText+'</span></div>';}
+  else if(sf==='ochtend'){document.getElementById('ss').innerHTML='<span style="color:#3d6a2d;font-size:20px">'+totalOchtendScans+'/'+totalOchtendExp+'</span>';document.getElementById('scans-detail').textContent=totalOchtendScans+' van '+totalOchtendExp+' scans ('+ochtendPct+'%) | 📅 '+datumText;}
+  else if(sf==='middag'){document.getElementById('ss').innerHTML='<span style="color:#3d6a8a;font-size:20px">'+totalMiddagScans+'/'+totalMiddagExp+'</span>';document.getElementById('scans-detail').textContent=totalMiddagScans+' van '+totalMiddagExp+' scans ('+middagPct+'%) | 📅 '+datumText;}
+  else if(sf==='nacht'){document.getElementById('ss').innerHTML='<span style="color:#5a2d88;font-size:20px">'+totalNachtScans+'/'+totalNachtExp+'</span>';document.getElementById('scans-detail').textContent=totalNachtScans+' van '+totalNachtExp+' scans ('+nachtPct+'%) | 📅 '+datumText;}
+  else{var totalAll=totalOchtendScans+totalMiddagScans+totalNachtScans;var totalExp=totalOchtendExp+totalMiddagExp+totalNachtExp;document.getElementById('ss').textContent=totalAll+'/'+totalExp;var pct=totalExp>0?Math.round(totalAll/totalExp*100):0;document.getElementById('scans-detail').textContent=totalAll+' van '+totalExp+' scans ('+pct+'%) | 📅 '+datumText;}
+  
+  var th=+document.getElementById('th').value||45;var totalAlerts=0;
+  var byR={};data.forEach(function(r){if(r.pin==='9999')return;if(!byR[r.pin])byR[r.pin]=[];byR[r.pin].push(r);});Object.keys(byR).forEach(function(k){byR[k].sort(function(a,b){return a.ts-b.ts;});});
+  routeKeys.forEach(function(pin){var scans=byR[pin]||[];if(!scans.length)return;var sh=getShift(scans[0].ts);var def=getRouteDef(pin,sh);for(var i=1;i<scans.length;i++){if(def&&spansBreak(scans[i-1].ts,scans[i].ts,def))continue;var gap=Math.round((scans[i].ts-scans[i-1].ts)/60000);if(gap>th)totalAlerts++;}});
+  var seenSmart2=new Set();var now2=new Date();
+  ROUTE_ORDER.forEach(function(pin){var scans=byR[pin]||[];if(!scans.length)return;var sh=getShift(scans[0].ts);var def=getRouteDef(pin,sh);var defO=getRouteDef(pin,'ochtend');var defM=getRouteDef(pin,'middag');var todayScans=df?scans.filter(function(s){return getOpDate(s.ts)===df;}):scans.filter(function(s){return getOpDate(s.ts)===gds(now2);});
+    [{'def':defO,'shift':'ochtend'},{'def':defM,'shift':'middag'}].forEach(function(si){var d=si['def'];if(!d||!d.winkels)return;d.winkels.forEach(function(w){var nk=norm(w.n);if(seenSmart2.has(nk))return;var recentScans=todayScans.filter(function(s){return matches(s.shop,w.n);});if(recentScans.length>0)return;var lastScan=getLastScanTimeForShop(w.n);var hoursSince=lastScan?Math.round((now2-lastScan)/3600000):999;if(hoursSince>5){seenSmart2.add(nk);totalAlerts++;}});});
+    if(!def||!def.winkels||!def.ronden)return;var sortedScans=scans.slice().sort(function(a,b){return a.ts-b.ts;});
+    def.ronden.forEach(function(ronde){var winkelsInRonde=def.winkels.filter(function(w){return w.r.includes(ronde.id);});if(!winkelsInRonde.length)return;var rondeScans=sortedScans.filter(function(s){var sm=s.ts.getHours()*60+s.ts.getMinutes();return sm>=ronde.start&&sm<ronde.end;});if(!rondeScans.length)return;var gescandeWinkels=[];rondeScans.forEach(function(s){winkelsInRonde.forEach(function(w){if(matches(s.shop,w.n)&&gescandeWinkels.indexOf(w)<0)gescandeWinkels.push(w);});});if(gescandeWinkels.length>=3&&gescandeWinkels.length<winkelsInRonde.length){var laatsteScanInRonde=rondeScans[rondeScans.length-1];var minutenSindsLaatste=Math.round((now2-laatsteScanInRonde.ts)/60000);if(minutenSindsLaatste>=60&&rondeScans.length>=3){totalAlerts++;}}});
+  });
+  document.getElementById('sa').textContent=totalAlerts;document.getElementById('alerts-detail').textContent=totalAlerts+' alert(s)';
+  var ctrlScans=data.filter(function(r){return r.pin==='9999';});document.getElementById('schecks').textContent=ctrlScans.length;document.getElementById('checks-detail').textContent=ctrlScans.length+' check(s)';
+  var notes=data.filter(function(r){return r.note&&r.note.trim()&&r.pin!=='9999';});document.getElementById('snotes').textContent=notes.length;document.getElementById('notes-detail').textContent=notes.length+' opmerking(en)';
+  checkDataVersheid();
+}
+function checkDataVersheid(){
+  var dw=document.getElementById('data-waarschuwing');var df=document.getElementById('df').value;var vandaag=gds(new Date());
+  if(df&&df!==vandaag){dw.className='show';document.getElementById('data-waarschuwing-text').textContent='⚠️ Je bekijkt data van '+df+'. Dit is niet vandaag ('+vandaag+').';}
+  else if(AD.length){var laatsteScan=AD.reduce(function(a,b){return a.ts>b.ts?a:b;}).ts;var minutenGeleden=Math.round((new Date()-laatsteScan)/60000);if(minutenGeleden>60){dw.className='show';document.getElementById('data-waarschuwing-text').textContent='⚠️ Upload nieuwe scandata. Deze data is verouderd ('+minutenGeleden+' min geleden).';}else{dw.className='';}}
+  else{dw.className='';}
+}
+function updateShiftBar(){
+  var m=new Date().getHours()*60+new Date().getMinutes();
+  document.getElementById('sb-och').className='shb och'+(m>=6*60+45&&m<14*60+45?' active':'');
+  document.getElementById('sb-mid').className='shb mid'+(m>=14*60+45&&m<22*60+45?' active':'');
+  document.getElementById('sb-nac').className='shb nac'+(m>=22*60+45||m<6*60+45?' active':'');
+  var ronde=getCurrentRonde();var el=document.getElementById('current-ronde');
+  if(el){if(isDienstwissel()){el.style.display='inline-flex';el.innerHTML='<span style="color:#d4a373;font-weight:600">🔄 Dienstwissel (14:10-15:15)</span>';el.style.borderColor='#d4a373';}else if(isPauze()){el.style.display='inline-flex';el.innerHTML='<span style="color:#3d6a8a;font-weight:600">⏸ Pauze</span>';el.style.borderColor='#3d6a8a';}else if(ronde){el.style.display='inline-flex';el.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+ronde.color+';margin-right:6px;animation:pulse 2s infinite"></span><strong>'+ronde.label+'</strong> nu actief <span style="color:#5a7a5a;font-size:10px">'+ronde.label.replace('Ronde','R')+' tot '+formatRondeEnd(ronde)+'</span>';el.style.borderColor=ronde.color;}else{el.style.display='inline-flex';el.innerHTML='<span style="color:#6a8a6a">⏳ Geen actieve ronde</span>';el.style.borderColor='#c5d5c0';}}
+}
+function switchView(v){var lv=document.getElementById('live-view'),rv=document.getElementById('report-view'),sv=document.getElementById('sample-view');if(lv)lv.style.display=v==='live'?'block':'none';if(rv)rv.style.display=v==='rapport'?'block':'none';if(sv)sv.style.display=v==='sample'?'block':'none';var ev=document.getElementById('eco-view');if(ev)ev.style.display=v==='eco'?'block':'none';document.querySelectorAll('.mnb').forEach(function(b){b.classList.remove('active');});var nb=document.getElementById('nav-'+v);if(nb)nb.classList.add('active');if(v==='rapport'&&typeof renderReport==='function')renderReport();if(v==='sample'&&typeof renderSample==='function')renderSample();if(v==='eco'&&typeof renderEco==='function')renderEco();}
+function stab(btn,show,cont){var c=document.getElementById(cont);if(!c)return;c.querySelectorAll(':scope>div').forEach(function(d){d.style.display='none';});var s=document.getElementById(show);if(s)s.style.display='';btn.closest('.ts').querySelectorAll('.t').forEach(function(t){t.classList.remove('on');});btn.classList.add('on');}
+function naarVandaag(){var vandaag=new Date();var d=vandaag.getFullYear()+'-'+String(vandaag.getMonth()+1).padStart(2,'0')+'-'+String(vandaag.getDate()).padStart(2,'0');document.getElementById('df').value=d;render();}
+// ============ MODALS ============
+function toggleRouteStatus(){var o=document.getElementById('route-status-overlay');if(!o){createRouteStatusModal();}else{o.classList.toggle('show');if(o.classList.contains('show'))updateRouteStatusModal();}}
+function createRouteStatusModal(){var o=document.createElement('div');o.id='route-status-overlay';o.className='route-status-overlay';o.innerHTML='<div class="route-status-modal"><button class="modal-close" onclick="document.getElementById(\'route-status-overlay\').classList.remove(\'show\')">×</button><h3>🚦 Routes aan het scannen</h3><div id="route-status-content"></div></div>';document.body.appendChild(o);o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});updateRouteStatusModal();}
+function updateRouteStatusModal(){var c=document.getElementById('route-status-content');if(!c)return;var routes=getActiveRoutes();var now=new Date();var thr=30;var h='';ROUTE_ORDER.forEach(function(pin){var info=routes[pin];if(!info)return;var st=getRouteStyle(pin);var ls=info.scans.length>0?info.scans[info.scans.length-1]:null;var ms=ls?Math.round((now-ls.ts)/60000):999;var ia=ls&&ms<thr;var hs=info.scans.length>0;var si,stx,sc;if(!hs){si='❌';stx='Nog niet gescand';sc='#b84030';}else if(ia){si='✅';stx='Actief ('+ms+'m)';sc='#2d8a40';}else{si='⚠️';stx='Te lang geleden ('+ms+'m)';sc='#b87820';}h+='<div class="route-status-item" style="border-left:4px solid '+st.color+'"><div class="status-icon">'+si+'</div><div class="route-info"><div class="route-name" style="color:'+st.color+'">'+st.name+'</div><div class="route-sub">'+info.scans.length+' scans · laatste: '+(ls?ls.ts.toLocaleTimeString('nl-NL'):'—')+'</div></div><div class="route-badge" style="background:'+st.bg+';color:'+sc+'">'+stx+'</div></div>';});c.innerHTML=h||'<p style="color:#5a7a5a;padding:20px;text-align:center">Geen actieve routes</p>';}
+function toggleScanDetail(){var o=document.getElementById('scan-detail-overlay');if(!o){createScanDetailModal();}else{o.classList.toggle('show');if(o.classList.contains('show'))updateScanDetailModal();}}
+function createScanDetailModal(){var o=document.createElement('div');o.id='scan-detail-overlay';o.className='scan-detail-overlay';o.innerHTML='<div class="scan-detail-modal"><button class="modal-close" onclick="document.getElementById(\'scan-detail-overlay\').classList.remove(\'show\')">×</button><h3>📊 Scan voortgang per route</h3><div id="scan-detail-content"></div></div>';document.body.appendChild(o);o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});updateScanDetailModal();}
+function updateScanDetailModal(){var c=document.getElementById('scan-detail-content');if(!c)return;var routes=getActiveRoutes();var sf=document.getElementById('sf').value;var df=document.getElementById('df').value;var dt=df?df:'Alle data';var h='<div style="margin-bottom:12px;padding:8px 14px;background:#f0f2eb;border-radius:8px;text-align:center;font-weight:600;color:#1a2f1a">📅 '+dt+'</div>';if(sf==='all'){var shifts=['ochtend','middag','nacht'];var sic={ochtend:'☀️',middag:'🌇',nacht:'🌙'};var snm={ochtend:'Ochtend',middag:'Middag',nacht:'Nacht'};shifts.forEach(function(sh){var sts=0,ste=0;var srs=[];ROUTE_ORDER.forEach(function(pin){var info=routes[pin];if(!info||!info.scans.length)return;var exp=calculateExpectedByShift(pin,info.scans);var s=exp[sh].scans;var e=exp[sh].expected;if(s===0&&e===0)return;sts+=s;ste+=e;var st=getRouteStyle(pin);var pct=e>0?Math.min(100,Math.round(s/e*100)):0;var col=pct>=80?'#2d8a40':pct>=50?'#b87820':'#b84030';srs.push({pin:pin,name:st.name,color:st.color,scans:s,exp:e,pct:pct,pc:col});});if(srs.length===0)return;h+='<div style="margin-bottom:14px"><div style="padding:8px 12px;background:#f0f2eb;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">'+sic[sh]+' '+snm[sh]+'</span><span style="color:#5a7a5a">'+sts+'/'+ste+' scans ('+Math.round(sts/Math.max(1,ste)*100)+'%)</span></div>';srs.forEach(function(r){h+='<div class="scan-progress-item"><div class="progress-header"><span class="progress-route" style="color:'+r.color+'">'+r.name+'</span><span class="progress-numbers">'+r.scans+' / '+r.exp+' scans ('+r.pct+'%)</span></div><div class="progress-bar"><div class="progress-fill" style="width:'+r.pct+'%;background:'+r.pc+'"></div></div></div>';});h+='</div>';});}else{var ts=0,te=0;ROUTE_ORDER.forEach(function(pin){var info=routes[pin];if(!info)return;var st=getRouteStyle(pin);var scans=info.scans;var sh=scans.length>0?getShift(scans[0].ts):'ochtend';var def=getRouteDef(pin,sh);var exp=def?def.winkels.reduce(function(s,w){return s+w.r.length;},0):0;var rondeScans=scans.length;var pct=exp>0?Math.min(100,Math.round(rondeScans/exp*100)):0;ts+=rondeScans;te+=exp;var col=pct>=80?'#2d8a40':pct>=50?'#b87820':'#b84030';h+='<div class="scan-progress-item"><div class="progress-header"><span class="progress-route" style="color:'+st.color+'">'+st.name+'</span><span class="progress-numbers">'+rondeScans+' / '+exp+' scans ('+pct+'%)</span></div><div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;background:'+col+'"></div></div></div>';});var tp=te>0?Math.round(ts/te*100):0;h='<div style="margin-bottom:12px;padding:8px 14px;background:#f0f2eb;border-radius:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">📅 '+dt+' | '+sf+'</span><span>'+ts+' van '+te+' scans · <span style="color:'+(tp>=80?'#2d8a40':tp>=50?'#b87820':'#b84030')+';font-weight:600">'+tp+'%</span></span></div>'+h;}c.innerHTML=h||'<p style="color:#5a7a5a;padding:20px;text-align:center">Geen data beschikbaar</p>';}
+
+// ============ ALERTS MODAL (2 kolommen) ============
+function toggleAlertDetail(){var o=document.getElementById('alert-detail-overlay');if(!o){createAlertDetailModal();}else{o.classList.toggle('show');if(o.classList.contains('show'))updateAlertDetailModal();}}
+function createAlertDetailModal(){var o=document.createElement('div');o.id='alert-detail-overlay';o.className='alert-detail-overlay';o.innerHTML='<div class="scan-detail-modal"><button class="modal-close" onclick="document.getElementById(\'alert-detail-overlay\').classList.remove(\'show\')">×</button><h3>⚠️ Alerts</h3><div id="alert-detail-content"></div></div>';document.body.appendChild(o);o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});updateAlertDetailModal();}
+function updateAlertDetailModal(){var c=document.getElementById('alert-detail-content');if(!c)return;
+  var th=+document.getElementById('th').value||45;var df=document.getElementById('df').value;
+  var data=getFilteredData();var byR={};data.forEach(function(r){if(r.pin==='9999')return;if(!byR[r.pin])byR[r.pin]=[];byR[r.pin].push(r);});Object.keys(byR).forEach(function(k){byR[k].sort(function(a,b){return a.ts-b.ts;});});
+  
+  var reistijdAlerts=[];Object.keys(byR).forEach(function(pin){var scans=byR[pin];var sh=scans.length>0?getShift(scans[0].ts):'ochtend';var def=getRouteDef(pin,sh);for(var i=1;i<scans.length;i++){if(def&&spansBreak(scans[i-1].ts,scans[i].ts,def))continue;var gap=Math.round((scans[i].ts-scans[i-1].ts)/60000);if(gap>th)reistijdAlerts.push({pin:pin,from:scans[i-1].shop,to:scans[i].shop,gap:gap,time:ft(scans[i].ts)});}});
+  
+  var smartAlerts=[];var seenSmart=new Set();var now=new Date();
+  ROUTE_ORDER.forEach(function(pin){
+    var defO=getRouteDef(pin,'ochtend');var defM=getRouteDef(pin,'middag');var scans=byR[pin]||[];
+    var todayScans=df?scans.filter(function(s){return getOpDate(s.ts)===df;}):scans.filter(function(s){return getOpDate(s.ts)===gds(now);});
+    [{'def':defO,'shift':'ochtend','label':'☀️ Ochtend'},{'def':defM,'shift':'middag','label':'🌇 Middag'}].forEach(function(si){
+      var def=si['def'];if(!def||!def.winkels)return;
+      def.winkels.forEach(function(w){var nk=norm(w.n);if(seenSmart.has(nk))return;var recentScans=todayScans.filter(function(s){return matches(s.shop,w.n);});if(recentScans.length>0)return;var lastScan=getLastScanTimeForShop(w.n);var hoursSince=lastScan?Math.round((now-lastScan)/3600000):999;if(hoursSince>5){seenSmart.add(nk);smartAlerts.push({type:'A',pin:pin,routeName:getRouteStyle(pin).name,color:getRouteStyle(pin).color,shop:w.n,shift:si['shift'],shiftLabel:si['label'],hoursSince:hoursSince});}});
+    });
+  });
+  ROUTE_ORDER.forEach(function(pin){
+    var scans=byR[pin]||[];if(!scans.length)return;var sh=getShift(scans[0].ts);var def=getRouteDef(pin,sh);if(!def||!def.winkels||!def.ronden)return;
+    var sortedScans=scans.slice().sort(function(a,b){return a.ts-b.ts;});
+    def.ronden.forEach(function(ronde){
+      var winkelsInRonde=def.winkels.filter(function(w){return w.r.includes(ronde.id);});if(!winkelsInRonde.length)return;
+      var rondeScans=sortedScans.filter(function(s){var sm=s.ts.getHours()*60+s.ts.getMinutes();return sm>=ronde.start&&sm<ronde.end;});if(!rondeScans.length)return;
+      var gescandeWinkels=[];rondeScans.forEach(function(s){winkelsInRonde.forEach(function(w){if(matches(s.shop,w.n)&&gescandeWinkels.indexOf(w)<0)gescandeWinkels.push(w);});});
+      if(gescandeWinkels.length>=3&&gescandeWinkels.length<winkelsInRonde.length){var nietGescand=winkelsInRonde.filter(function(w){return gescandeWinkels.indexOf(w)<0;});var laatsteScanInRonde=rondeScans[rondeScans.length-1];var minutenSindsLaatste=Math.round((now-laatsteScanInRonde.ts)/60000);if(minutenSindsLaatste>=60&&rondeScans.length>=3){nietGescand.forEach(function(w){var nk='B-'+pin+'-'+ronde.id+'-'+norm(w.n);if(seenSmart.has(nk))return;seenSmart.add(nk);smartAlerts.push({type:'B',pin:pin,routeName:getRouteStyle(pin).name,color:getRouteStyle(pin).color,shop:w.n,shift:sh,shiftLabel:SHIFTS[sh]?SHIFTS[sh].label:sh,rondeLabel:ronde.label});});}}
+    });
+  });
+  
+  var totalAlerts=reistijdAlerts.length+smartAlerts.length;
+  if(!totalAlerts){c.innerHTML='<p style="color:#2d8a40;padding:20px;text-align:center;font-weight:600">✅ Geen alerts!</p>';return;}
+  
+  var h='<div style="margin-bottom:14px;padding:10px 14px;background:#f5e0dd;border-radius:8px;color:#983028;font-weight:600">⚠️ Totaal '+totalAlerts+' alert(s) — ⏱ Reistijd: '+reistijdAlerts.length+' | 🔍 Scantijd: '+smartAlerts.length+'</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
+  
+  // LINKERKOLOM: Reistijd
+  h+='<div><div style="padding:8px 12px;background:#f5e0dd;border-radius:8px;font-weight:600;color:#983028;margin-bottom:8px">⏱ Reistijd overschreden ('+reistijdAlerts.length+')</div>';
+  if(reistijdAlerts.length){
+    var byRt={};reistijdAlerts.forEach(function(a){if(!byRt[a.pin])byRt[a.pin]=[];byRt[a.pin].push(a);});
+    ROUTE_ORDER.forEach(function(pin){var ra=byRt[pin];if(!ra||!ra.length)return;var st=getRouteStyle(pin);
+      h+='<div style="margin-bottom:6px;border:1px solid #d5e0d0;border-radius:8px;overflow:hidden"><div style="padding:6px 12px;background:'+st.bg+';color:'+st.color+';font-weight:600;font-size:12px;cursor:pointer" onclick="var d=document.getElementById(\'reistijd-'+pin+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\';">'+st.name+' ('+ra.length+')</div><div id="reistijd-'+pin+'" style="display:none;padding:4px 10px">';
+      ra.forEach(function(a){h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #e8f0e0;font-size:11px"><span style="font-size:10px">'+a.from.substring(0,16)+' → '+a.to.substring(0,16)+'</span><span style="font-weight:600;color:#b84030;white-space:nowrap">'+a.gap+' min</span><span style="color:#5a7a5a;font-size:10px;white-space:nowrap">'+a.time+'</span></div>';});
+      h+='</div></div>';
+    });
+  }else{h+='<p style="color:#5a7a5a;font-size:12px;padding:8px">Geen reistijd alerts</p>';}
+  h+='</div>';
+  
+  // RECHTERKOLOM: Scantijd
+  h+='<div><div style="padding:8px 12px;background:#fef5e0;border-radius:8px;font-weight:600;color:#b87820;margin-bottom:8px">🔍 Scantijd / niet gescand ('+smartAlerts.length+')</div>';
+  if(smartAlerts.length){
+    var bySR={};smartAlerts.forEach(function(a){if(!bySR[a.pin])bySR[a.pin]=[];bySR[a.pin].push(a);});
+    ROUTE_ORDER.forEach(function(pin){var sa=bySR[pin];if(!sa||!sa.length)return;var st=getRouteStyle(pin);
+      h+='<div style="margin-bottom:6px;border:1px solid #d5e0d0;border-radius:8px;overflow:hidden"><div style="padding:6px 12px;background:'+st.bg+';color:'+st.color+';font-weight:600;font-size:12px;cursor:pointer" onclick="var d=document.getElementById(\'scantijd-'+pin+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\';">'+st.name+' ('+sa.length+')</div><div id="scantijd-'+pin+'" style="display:none;padding:4px 10px">';
+      sa.forEach(function(a){var icon=a.type==='B'?'🔴':'🟡';var info=a.type==='B'?'Overgeslagen in '+a.rondeLabel:'>5u niet gescand';var advies=a.type==='B'?'📞 Contacteer medewerker / 🏷 Check tag':'🏷 Check tag (voorman)';h+='<div style="padding:4px 0;border-bottom:1px solid #e8f0e0;font-size:11px"><div style="font-weight:600">'+icon+' '+a.shop+'</div><div style="color:#5a7a5a;font-size:10px">'+info+'</div><div style="color:#b84030;font-size:10px">'+advies+'</div></div>';});
+      h+='</div></div>';
+    });
+  }else{h+='<p style="color:#5a7a5a;font-size:12px;padding:8px">Geen scantijd alerts</p>';}
+  h+='</div>';
+  h+='</div>';
+  c.innerHTML=h;
+}
+
+function toggleNoteDetail(){var o=document.getElementById('note-detail-overlay');if(!o){createNoteDetailModal();}else{o.classList.toggle('show');if(o.classList.contains('show'))updateNoteDetailModal();}}
+function createNoteDetailModal(){var o=document.createElement('div');o.id='note-detail-overlay';o.className='note-detail-overlay';o.innerHTML='<div class="scan-detail-modal"><button class="modal-close" onclick="document.getElementById(\'note-detail-overlay\').classList.remove(\'show\')">×</button><h3>📝 Opmerkingen overzicht</h3><div id="note-detail-content"></div></div>';document.body.appendChild(o);o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});updateNoteDetailModal();}
+function updateNoteDetailModal(){var c=document.getElementById('note-detail-content');if(!c)return;var data=getFilteredData();var notes=data.filter(function(r){return r.note&&r.note.trim()&&r.pin!=='9999';});if(!notes.length){c.innerHTML='<p style="color:#5a7a5a;padding:20px;text-align:center">📝 Geen opmerkingen</p>';return;}var h='<div style="margin-bottom:12px;padding:10px 14px;background:#e8f0f0;border-radius:8px;color:#3d6a8a;font-weight:600">📝 '+notes.length+' opmerking(en)</div>';notes.sort(function(a,b){return a.ts-b.ts;}).forEach(function(n){var st=getRouteStyle(n.pin);var t=n.ts.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});h+='<div class="note-item" style="border-left-color:'+st.color+'"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span class="note-time">⏱ '+t+'</span>'+getRouteButton(n.pin)+'<span class="note-shop">'+n.shop+'</span></div><div class="note-text">💬 '+n.note+'</div></div>';});c.innerHTML=h;}
+
+// ============ KLANT CHECKS MODAL ============
+function toggleKlantChecks(){var o=document.getElementById('klant-checks-overlay');if(!o){createKlantChecksModal();}else{o.classList.toggle('show');if(o.classList.contains('show'))updateKlantChecksModal();}}
+function createKlantChecksModal(){var o=document.createElement('div');o.id='klant-checks-overlay';o.className='klant-checks-overlay';o.innerHTML='<div class="scan-detail-modal"><button class="modal-close" onclick="document.getElementById(\'klant-checks-overlay\').classList.remove(\'show\')">×</button><h3>✅ Klant Checks (999/9999)</h3><div id="klant-checks-content"></div></div>';document.body.appendChild(o);o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});updateKlantChecksModal();}
+function updateKlantChecksModal(){var c=document.getElementById('klant-checks-content');if(!c)return;var data=getFilteredData();var ctrlScans=data.filter(function(r){return r.pin==='9999';});if(!ctrlScans.length){c.innerHTML='<p style="color:#2d8a40;padding:20px;text-align:center;font-weight:600">✅ Geen klant checks in deze periode.</p>';return;}
+  var byRoute={};
+  ctrlScans.forEach(function(s){var rp='Onbekend';Object.keys(RM).forEach(function(pin){if(pin==='9999')return;var sh=getShift(s.ts);var def=getRouteDef(pin,sh);if(def&&def.winkels&&def.winkels.some(function(w){return matches(s.shop,w.n);})){rp=pin;}});if(!byRoute[rp])byRoute[rp]=[];byRoute[rp].push(s);});
+  var routeNames=Object.keys(byRoute).sort(function(a,b){return(ROUTE_ORDER.indexOf(a)<0?99:ROUTE_ORDER.indexOf(a))-(ROUTE_ORDER.indexOf(b)<0?99:ROUTE_ORDER.indexOf(b));});
+  var h='<div style="margin-bottom:12px;padding:10px 14px;background:#f0e8f5;border-radius:8px;color:#6a3d8a;font-weight:600">✅ Totaal '+ctrlScans.length+' klant checks</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">';
+  routeNames.forEach(function(rp,idx){var st=getRouteStyle(rp);var count=byRoute[rp].length;h+='<span class="klant-check-cat'+(idx===0?' active':'')+'" style="background:'+st.bg+';color:'+st.color+'" onclick="switchKlantCheckCat(\''+rp+'\')" id="kcc-'+rp+'">'+st.name+' ('+count+')</span>';});
+  h+='</div><div id="klant-checks-detail">';
+  if(routeNames.length>0){var rp=routeNames[0];var st=getRouteStyle(rp);h+='<div style="border-left:4px solid '+st.color+';padding-left:12px"><h4 style="color:'+st.color+';margin:0 0 8px">'+st.name+'</h4>';byRoute[rp].sort(function(a,b){return a.ts-b.ts;}).forEach(function(s){var time=s.ts.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});h+='<div class="note-item" style="border-left-color:'+st.color+'"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:600;font-size:12px">⏱ '+time+'</span><span>'+s.shop+'</span>'+(s.note?'<span style="color:#5a2d88;font-size:11px">💬 '+s.note+'</span>':'')+'</div></div>';});h+='</div>';}
+  h+='</div>';c.innerHTML=h;c.dataset.activeCat=routeNames.length>0?routeNames[0]:'';}
+function switchKlantCheckCat(rp){
+  document.querySelectorAll('.klant-check-cat').forEach(function(el){el.classList.remove('active');});var btn=document.getElementById('kcc-'+rp);if(btn)btn.classList.add('active');
+  var data=getFilteredData();var ctrlScans=data.filter(function(r){return r.pin==='9999';});var byRoute={};
+  ctrlScans.forEach(function(s){var rp2='Onbekend';Object.keys(RM).forEach(function(pin){if(pin==='9999')return;var sh=getShift(s.ts);var def=getRouteDef(pin,sh);if(def&&def.winkels&&def.winkels.some(function(w){return matches(s.shop,w.n);})){rp2=pin;}});if(!byRoute[rp2])byRoute[rp2]=[];byRoute[rp2].push(s);});
+  var scans=byRoute[rp]||[];var st=getRouteStyle(rp);var h='<div style="border-left:4px solid '+st.color+';padding-left:12px"><h4 style="color:'+st.color+';margin:0 0 8px">'+st.name+' ('+scans.length+' checks)</h4>';
+  scans.sort(function(a,b){return a.ts-b.ts;}).forEach(function(s){var time=s.ts.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});h+='<div class="note-item" style="border-left-color:'+st.color+'"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:600;font-size:12px">⏱ '+time+'</span><span>'+s.shop+'</span>'+(s.note?'<span style="color:#5a2d88;font-size:11px">💬 '+s.note+'</span>':'')+'</div></div>';});
+  h+='</div>';var detail=document.getElementById('klant-checks-detail');if(detail)detail.innerHTML=h;}
+
+// ============ RENDER ============
+function render(){
+  var th=+document.getElementById('th').value||45;var rf=document.getElementById('rf').value;var sf=document.getElementById('sf').value;if(!AD.length)return;
+  var data=getFilteredData();var byR={};
+  data.forEach(function(r){if(r.pin==='9999')return;if(!byR[r.pin])byR[r.pin]=[];byR[r.pin].push(r);});
+  Object.keys(byR).forEach(function(k){byR[k].sort(function(a,b){return a.ts-b.ts;});});
+  var rAl={};
+  Object.keys(byR).forEach(function(k){var al=[],s=byR[k];var sh=getShift(s[0].ts);var def=getRouteDef(k,sh);for(var i=1;i<s.length;i++){if(spansBreak(s[i-1].ts,s[i].ts,def))continue;var g=(s[i].ts-s[i-1].ts)/60000;if(g>th)al.push({from:s[i-1].shop,to:s[i].shop,gap:Math.round(g),time:ft(s[i].ts)});}rAl[k]=al;});
+  updateKPIValues();updateShiftBar();checkDataVersheid();
+  var aAll=[];Object.keys(rAl).forEach(function(k){rAl[k].forEach(function(a){aAll.push({pin:k,from:a.from,to:a.to,gap:a.gap,time:a.time});});});
+  var ab=document.getElementById('ab');if(aAll.length){ab.className='show';document.getElementById('al').innerHTML=aAll.map(function(a){var st=getRouteStyle(a.pin);var fs=a.from.length>20?a.from.substring(0,18)+'…':a.from;var ts=a.to.length>20?a.to.substring(0,18)+'…':a.to;return'<div class="ac"><span class="alert-route-dot" style="background:'+st.color+'"></span><span style="font-weight:500">'+st.name+'</span><span style="color:#3d1815">'+fs+' → '+ts+'</span><span class="alert-gap">'+a.gap+' min</span><span class="alert-time">'+a.time+'</span></div>';}).join('');}else ab.className='';
+  var routes=ROUTE_ORDER.slice();if(rf!=='all')routes=routes.filter(function(k){return k===rf;});
+  document.getElementById('rg').innerHTML=routes.map(function(k){
+    var inf=getRouteStyle(k);var scans=byR[k]||[],als=rAl[k]||[],hasAl=als&&als.length>0;
+    var shiftLabel='';var liveBadge='';
+    if(sf==='all'){shiftLabel='☀️ Ochtend + 🌇 Middag';var liveStatus=getRouteLiveStatus(k,scans);if(liveStatus.status!=='no-def'){liveBadge='<span class="'+liveStatus.statusCls+'">'+liveStatus.statusText+'<span class="lb-tt">'+liveStatus.tooltip+'</span></span>';}}
+    else{var sh=scans.length>0?getShift(scans[0].ts):'ochtend';shiftLabel=SHIFTS[sh]?SHIFTS[sh].label:sh;}
+    var exp=0,rondeScans=0,totalScans=scans.filter(function(s){return!isLiftScan(s.shop);}).length;
+    if(sf==='all'){var merged=mergeShiftsForChecklist(k);if(merged){exp=merged.winkels.reduce(function(s,w){return s+w.r.length;},0);merged.winkels.forEach(function(w){var winkelScans=scans.filter(function(s){return matches(s.shop,w.n)&&!isLiftScan(s.shop);});rondeScans+=countRondeScansForWinkel(w.r,winkelScans);});}}
+    else{var sh=scans.length>0?getShift(scans[0].ts):'ochtend';var def=getRouteDef(k,sh);exp=def?def.winkels.reduce(function(s,w){return s+w.r.length;},0):0;rondeScans=countRondeScansForDef(def,scans);}
+    var pct=exp>0?Math.min(100,Math.round(totalScans/exp*100)):0;var fc=pct>=100?'#2d8a40':pct>60?'#b87820':'#3d6a8a';
+    var scanH=scans.map(function(s,i,arr){if(i===0){var r0=getRonde(s.ts);var rb0=r0?'<span class="rbadge" style="background:'+r0.color+'1a;color:'+r0.color+'">'+r0.label+'</span>':'';var liftLabel=isLiftScan(s.shop)?' <span style="font-size:8px;color:#8a9a8a">[lift]</span>':'';return'<div class="sr">'+rb0+'<span class="st2">'+ft(s.ts)+'</span><span class="sho">'+s.shop+liftLabel+'</span><span class="sg go">start</span></div>';}var prevScan=arr[i-1];if(sf!=='all'){var sh2=getShift(scans[0].ts);var def2=getRouteDef(k,sh2);if(def2&&spansBreak(prevScan.ts,s.ts,def2)){return'<div class="sr pr">'+def2.pTekst+'</div><div class="sr"><span class="st2">'+ft(s.ts)+'</span><span class="sho">'+s.shop+'</span><span class="sg go">na pauze</span></div>';}}var mins=Math.round((s.ts-prevScan.ts)/60000);var gc=mins>th?'ga':mins>th*.7?'gw':'go';var noteHtml=s.note?'<span class="nbadge">💬 opmerking<span class="ntt">'+s.note+'</span></span>':'';var curRonde=getRonde(s.ts);var prevRonde=getRonde(prevScan.ts);var rondeChanged=curRonde&&(!prevRonde||curRonde.id!==prevRonde.id);var rondeBanner=rondeChanged?'<div class="ronde-divider"><span style="background:'+curRonde.color+'1a;color:'+curRonde.color+'">🔄 '+curRonde.label+' gestart</span></div>':'';var liftLabel=isLiftScan(s.shop)?' <span style="font-size:8px;color:#8a9a8a">[lift]</span>':'';return rondeBanner+'<div class="sr"><span class="st2">'+ft(s.ts)+'</span><span class="sho">'+s.shop+liftLabel+noteHtml+'</span><span class="sg '+gc+'">'+(mins>th?'+'+mins+'m ⚠':'+'+mins+'m')+'</span></div>';}).join('');
+    var notesWithText=scans.filter(function(s){return s.note;});var notesH=notesWithText.length?notesWithText.map(function(s){return'<div class="nrow"><span class="ntime">'+ft(s.ts)+'</span><span class="nshop">'+s.shop+'</span><span class="ntxt">💬 '+s.note+'</span></div>';}).join(''):'<div class="nonotes">📝 Geen opmerkingen in deze periode</div>';
+    var clH='<div style="padding:8px;font-size:10px;color:#5a7a5a">Geen routedefinitie beschikbaar</div>';
+    var rondeStatusBar='';
+    if(sf==='all'){rondeStatusBar='<div style="display:flex;gap:8px;padding:2px 9px 4px;border-bottom:1px solid #e0e8da;flex-wrap:wrap">';rondeStatusBar+=getRondeStatusBar(k,'ochtend',scans);rondeStatusBar+=getRondeStatusBar(k,'middag',scans);rondeStatusBar+='</div>';}
+    else{var sh=scans.length>0?getShift(scans[0].ts):'ochtend';rondeStatusBar=getRondeStatusBar(k,sh,scans);}
+    if(sf==='all'){var mergedDef=mergeShiftsForChecklist(k);if(mergedDef&&mergedDef.winkels.length){var rondenInfo=mergedDef.ronden.map(function(r){return'<span style="background:#f0f2eb;border-radius:3px;padding:1px 6px;font-size:9px;color:#5a7a5a">R'+r.id+': '+r.tijd+'</span>';}).join(' ');clH=rondeStatusBar+'<div style="padding:4px 9px 5px;border-bottom:1px solid #e0e8da;display:flex;gap:4px;flex-wrap:wrap;align-items:center"><span style="font-size:9px;color:#5a7a5a">Ronden:</span>'+rondenInfo+(mergedDef.pTekst?'<span style="font-size:9px;color:#2d6a2d;margin-left:4px">'+mergedDef.pTekst+'</span>':'')+'</div>';clH+=mergedDef.winkels.map(function(w){var winkelScans=scans.filter(function(s){return matches(s.shop,w.n)&&!isLiftScan(s.shop);});var result=assignScansToRondesMerged(w.r,winkelScans);var rondeSlots=w.r.map(function(rid){return renderRondeSlot(result.assignments,rid);}).join('');var extraBadges=result.extraScans.filter(function(s){return!isLiftScan(s.shop);}).map(function(s){return renderExtraScanBadge(s);}).join('');var hasAnyScan=winkelScans.length>0;return'<div class="cr"><span class="cd" style="background:'+(hasAnyScan?'#1a7a3a':'#1a2f1a')+'"></span><span style="flex:1">'+w.n+'</span><span style="display:flex;gap:3px;align-items:center;flex-wrap:wrap">'+rondeSlots+extraBadges+'</span></div>';}).join('');}}
+    else{var sh=scans.length>0?getShift(scans[0].ts):'ochtend';var def=getRouteDef(k,sh);if(def&&def.winkels.length){var rondenInfo=def.ronden.map(function(r){return'<span style="background:#f0f2eb;border-radius:3px;padding:1px 6px;font-size:9px;color:#5a7a5a">R'+r.id+': '+r.tijd+'</span>';}).join(' ');var nightLegend=sh==='nacht'?'<div style="padding:4px 9px 5px;border-bottom:1px solid #e0e8da;font-size:10px;color:#5a7a5a"><span style="color:#6a8a6a;font-weight:500">Afvalstromen: </span>[doos] Karton &nbsp;[porselein] PD &nbsp;[croissant] Swill &nbsp;[koffie] Koffie &nbsp;[sinaas] Sinaasappel &nbsp;[glas] Glas &nbsp;🫙 Porselein</div>':'';clH=rondeStatusBar+'<div style="padding:4px 9px 5px;border-bottom:1px solid #e0e8da;display:flex;gap:4px;flex-wrap:wrap;align-items:center"><span style="font-size:9px;color:#5a7a5a">Ronden:</span>'+rondenInfo+(def.pTekst?'<span style="font-size:9px;color:#2d6a2d;margin-left:4px">'+def.pTekst+'</span>':'')+'</div>'+nightLegend;clH+=def.winkels.map(function(w,i){var mid=Math.floor(def.winkels.length/2);var pr=i===mid&&def.pTekst?'<div class="cr pr2"><span class="cd" style="background:#2d6a2d"></span><span style="flex:1">'+def.pTekst+'</span></div>':'';var winkelScans=scans.filter(function(s){return matches(s.shop,w.n)&&!isLiftScan(s.shop);});var result=assignScansToRondesMerged(w.r,winkelScans);var rondeSlots=w.r.map(function(rid){return renderRondeSlot(result.assignments,rid);}).join('');var extraBadges=result.extraScans.filter(function(s){return!isLiftScan(s.shop);}).map(function(s){return renderExtraScanBadge(s);}).join('');var hasAnyScan=winkelScans.length>0;return''+pr+'<div class="cr"><span class="cd" style="background:'+(hasAnyScan?'#1a7a3a':'#1a2f1a')+'"></span><span style="flex:1">'+w.n+'</span><span style="display:flex;gap:3px;align-items:center;flex-wrap:wrap">'+rondeSlots+extraBadges+'</span></div>';}).join('');}else if(def&&def.winkels.length===0&&sh!=='nacht'){clH='<div style="padding:8px;font-size:10px;color:#5a7a5a">Geen winkels gepland in deze dienst</div>';}}
+    var rhClass=inf.rhClass||'';var rcClass=inf.rcClass||'';var lastScan=scans.length?scans[scans.length-1]:null;
+    return'<div class="rc '+rcClass+' '+(hasAl?'ha':'')+'"><div class="rh '+rhClass+'" style="border-left:none"><div><div class="rn"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+inf.color+';margin-right:4px"></span>'+inf.name+'<span class="rs">('+k+')</span><span style="font-size:9px;background:rgba(255,255,255,0.5);border-radius:3px;padding:1px 5px;margin-left:4px;color:#5a7a5a">'+shiftLabel+'</span></div><div class="rm">'+totalScans+'/'+(exp||'?')+' scans · laatste: '+(lastScan?ft(lastScan.ts):'—')+'</div>'+((function(){var lr=lastScan?getRonde(lastScan.ts):null;return lr?'<div style="font-size:9px;margin-top:2px;color:'+lr.color+'">● '+lr.label+' ('+ft(lastScan.ts)+')</div>':'';})())+'</div><div class="lb-wrap">'+liveBadge+'<span class="rbg '+(hasAl?'ral':'rok')+'">'+(hasAl?als.length+' alert'+(als.length>1?'s':''):'✓ OK')+'</span></div></div><div class="pw"><div class="pb2"><div class="pf" style="width:'+pct+'%;background:'+fc+'"></div></div><span class="plb">'+pct+'% ('+totalScans+'/'+(exp||'?')+')</span></div><div class="ts"><div class="t on" onclick="stab(this,\'sc'+k+'\',\'li'+k+'\')">📍 Scans</div><div class="t" onclick="stab(this,\'ch'+k+'\',\'li'+k+'\')">✅ Checklist</div><div class="t" onclick="stab(this,\'nt'+k+'\',\'li'+k+'\')">💬 Opmerkingen '+(notesWithText.length?' <span style="background:#e0eef5;border-radius:10px;padding:0 5px;font-size:9px;color:#2d5a6a">'+notesWithText.length+'</span>':'')+'</div></div><div id="li'+k+'"><div id="sc'+k+'" class="sli">'+scanH+'</div><div id="ch'+k+'" class="cli" style="display:none">'+clH+'</div><div id="nt'+k+'" class="nlist" style="display:none">'+notesH+'</div></div></div>';
+  }).join('');
+}
+
+// ============ SAMPLE ============
+function _sampleKey(k){return'scanDash_sample_'+k;}
+function _getSample(k){try{return JSON.parse(localStorage.getItem(_sampleKey(k))||'null');}catch(e){return null;}}
+function _setSample(k,v){try{localStorage.setItem(_sampleKey(k),JSON.stringify(v));}catch(e){}}
+function renderSample(){var root=document.getElementById('sample-view');if(!root)return;if(typeof AD==='undefined'||!AD.length){root.innerHTML='<div style="text-align:center;padding:80px 20px;color:#6a8a6a"><div style="font-size:48px;margin-bottom:14px">🎲</div>Eerst data laden via CSV-upload of URL-fetch.</div>';return;}var allDays=Array.from(new Set(AD.map(function(r){return getOpDate(r.ts);}))).sort();var defaultDay=allDays[allDays.length-1];var selectedDay=root.dataset.selectedDay||defaultDay;if(!allDays.includes(selectedDay))selectedDay=defaultDay;var sample=_getSample(selectedDay);var dayNms=['Zo','Ma','Di','Wo','Do','Vr','Za'];var dayOpts=allDays.map(function(d){var dt=new Date(d+'T12:00:00');return'<option value="'+d+'" '+(d===selectedDay?'selected':'')+'>'+dayNms[dt.getDay()]+' '+fmtShort(dt)+'/'+dt.getFullYear()+'</option>';}).join('');var ctrlScans=AD.filter(function(s){return s.pin==='9999'&&getOpDate(s.ts)===selectedDay;});var ctrlByShop={};ctrlScans.forEach(function(s){var k=norm(s.shop||'');if(!ctrlByShop[k])ctrlByShop[k]=[];ctrlByShop[k].push(s);});function isChecked(shop){var k=norm(shop||'');return ctrlByShop[k]&&ctrlByShop[k].length>0;}var drawn=sample?sample.items.length:0;var checked=sample?sample.items.filter(function(it){return isChecked(it.shop);}).length:0;var pct=drawn>0?Math.round(checked/drawn*100):0;var pctColor=pct>=80?'#2d8a40':pct>=50?'#b87820':'#b84030';var html='<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap"><h2 style="margin:0;font-size:18px;font-weight:700;color:#1a2f1a">🎲 Steekproef Controle</h2><span style="color:#5a7a5a;font-size:12px">Pincode <code style="background:#f5e0dd;color:#983028;padding:1px 6px;border-radius:4px;font-weight:600">9999</code></span></div><div class="rep-section"><div class="rep-sh" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><label style="font-size:12px;font-weight:500;color:#1a2f1a;display:flex;align-items:center;gap:8px">📅 Datum: <select id="sample-day" style="padding:6px 10px;border:1px solid #c5d5c0;border-radius:8px;font-size:12px;background:#f8faf5">'+dayOpts+'</select></label><label style="font-size:12px;font-weight:500;color:#1a2f1a;display:flex;align-items:center;gap:8px">🔢 Aantal: <input type="number" id="sample-n" value="'+(sample?sample.n||3:3)+'" min="1" max="20" style="width:60px;padding:6px 10px;border:1px solid #c5d5c0;border-radius:8px;font-size:12px;background:#f8faf5"></label><button type="button" onclick="generateSample()" class="rep-btn primary" style="margin-left:auto">🎲 Trek nieuwe steekproef</button><button type="button" onclick="exportAudit()" class="rep-btn">📄 Audit-export</button>'+(sample?'<button type="button" onclick="printSample()" class="rep-btn">🖨 Print</button><button type="button" onclick="clearSample()" class="rep-btn" style="color:#983028">🗑 Wissen</button>':'')+'</div>';if(sample){html+='<div class="rep-body" style="background:#f0f5eb"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px"><div style="background:#f8faf5;border-radius:12px;padding:16px"><div style="font-size:26px;font-weight:700;color:#1a2f1a">'+drawn+'</div><div style="font-size:10.5px;font-weight:600;color:#6a8a6a;text-transform:uppercase;margin-top:4px">Winkels in steekproef</div></div><div style="background:#f8faf5;border-radius:12px;padding:16px"><div style="font-size:26px;font-weight:700;color:#2d8a40">'+checked+'</div><div style="font-size:10.5px;font-weight:600;color:#6a8a6a;text-transform:uppercase;margin-top:4px">Gecontroleerd</div></div><div style="background:#f8faf5;border-radius:12px;padding:16px"><div style="font-size:26px;font-weight:700;color:'+pctColor+'">'+pct+'%</div><div style="font-size:10.5px;font-weight:600;color:#6a8a6a;text-transform:uppercase;margin-top:4px">Compliance</div></div><div style="background:#f8faf5;border-radius:12px;padding:16px"><div style="font-size:26px;font-weight:700;color:#983028">'+ctrlScans.length+'</div><div style="font-size:10.5px;font-weight:600;color:#6a8a6a;text-transform:uppercase;margin-top:4px">Totaal 9999-scans</div></div></div></div></div>';}else{html+='<div class="rep-body" style="text-align:center;padding:60px 20px;color:#6a8a6a"><div style="font-size:48px;margin-bottom:12px">🎲</div><div style="font-size:14px;font-weight:500;color:#5a7a5a;margin-bottom:6px">Nog geen steekproef voor deze dag</div><div>Klik "Trek nieuwe steekproef" om random winkels te selecteren.</div></div></div>';}root.innerHTML=html;var daySel=document.getElementById('sample-day');if(daySel){daySel.addEventListener('change',function(e){root.dataset.selectedDay=e.target.value;renderSample();});}}
+function generateSample(){if(typeof AD==='undefined'||!AD.length){alert('Geen data geladen.');return;}var root=document.getElementById('sample-view');var day=(document.getElementById('sample-day')||{}).value;if(!day){alert('Selecteer een dag.');return;}var n=parseInt((document.getElementById('sample-n')||{}).value||'3',10);var dayEnd=new Date(day+'T23:59:59').getTime();var since30=dayEnd-30*86400000;var visitCount={},noteCount={};AD.forEach(function(s){if(s.pin==='9999')return;if(isLiftScan(s.shop))return;var t=s.ts.getTime();if(t<since30||t>dayEnd)return;var k=norm(s.shop||'');visitCount[k]=(visitCount[k]||0)+1;if((s.note||'').trim())noteCount[k]=(noteCount[k]||0)+1;});var cntFor=function(name){return visitCount[norm(name)]||0;};var noteFor=function(name){return noteCount[norm(name)]||0;};var recentlySampled=new Set();var dayMs=new Date(day+'T12:00:00').getTime();for(var i=1;i<=7;i++){var d=new Date(dayMs-i*86400000);var dkey=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');var prev=_getSample(dkey);if(prev&&prev.items){prev.items.forEach(function(it){recentlySampled.add(norm(it.shop));});}}var excludedCount=0;var items=[];Object.keys(RM).forEach(function(pin){if(pin==='9999')return;var route=RM[pin];['dag','avond','nacht'].forEach(function(sh){var def=route[sh];if(!def||!def.winkels||!def.winkels.length)return;var allWinkels=def.winkels.map(function(w){return w.n;});var available=allWinkels.filter(function(w){return!recentlySampled.has(norm(w));});var skipped=allWinkels.length-available.length;excludedCount+=skipped;if(available.length<n)available=allWinkels;var sorted=available.slice().sort(function(a,b){return cntFor(b)-cntFor(a);});var mid=Math.floor(sorted.length/2);var high=sorted.slice(0,Math.max(1,mid));var low=sorted.slice(Math.max(1,mid));var weightedLow=[];low.forEach(function(w){var weight=1+noteFor(w)*3;for(var i=0;i<weight;i++)weightedLow.push(w);});var shuffle=function(a){return a.slice().sort(function(){return Math.random()-0.5;});};var pickFromWeighted=function(pool,count){var picked=[];var shuffled=shuffle(pool);for(var i=0;i<shuffled.length;i++){var w=shuffled[i];if(picked.includes(w))continue;picked.push(w);if(picked.length>=count)break;}return picked;};var picked=shuffle(high).slice(0,1).concat(pickFromWeighted(weightedLow,n-1)).filter(Boolean);if(picked.length<n){var remaining=shuffle(sorted.filter(function(w){return!picked.includes(w);}));picked=picked.concat(remaining.slice(0,n-picked.length));}picked.forEach(function(shop){items.push({pin:pin,shop:shop,shift:sh,shiftLabel:{dag:'Ochtend',avond:'Middag',nacht:'Nacht'}[sh],visits30d:cntFor(shop),notes30d:noteFor(shop),category:high.includes(shop)?'vaak':'weinig',hasRisk:noteFor(shop)>0});});});});if(!items.length){alert('Geen winkels gevonden.');return;}_setSample(day,{generatedAt:Date.now(),n:n,items:items,excludedRecent:excludedCount});if(root)root.dataset.selectedDay=day;renderSample();}
+function clearSample(){var day=(document.getElementById('sample-day')||{}).value;if(!day)return;if(!confirm('Steekproef voor '+day+' wissen?'))return;try{localStorage.removeItem(_sampleKey(day));}catch(e){}renderSample();}
+function exportAudit(){if(typeof AD==='undefined'||!AD.length){alert('Geen data geladen.');return;}var days=prompt('Audit-export voor laatste hoeveel dagen?','90');if(!days)return;var N=parseInt(days,10)||90;var today=new Date();var rows=[['Datum','Dienst','Route','Pincode','Winkel','In steekproef','Type','Bezoeken 30d','9999-scan tijd','Audit status']];for(var i=0;i<N;i++){var d=new Date(today.getTime()-i*86400000);var dkey=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');var sample=_getSample(dkey);var dayCtrl=AD.filter(function(r){return r.pin==='9999'&&getOpDate(r.ts)===dkey;});var dayCtrlByShop={};dayCtrl.forEach(function(r){var k=norm(r.shop||'');if(!dayCtrlByShop[k])dayCtrlByShop[k]=[];dayCtrlByShop[k].push(r);});var sampledShopKeys=new Set();if(sample&&sample.items){sample.items.forEach(function(it){var k=norm(it.shop||'');sampledShopKeys.add(k);var checks=dayCtrlByShop[k]||[];var checkTime=checks.length>0?checks.map(function(c){return c.ts.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});}).join('; '):'';rows.push([dkey,it.shiftLabel||'',getRouteStyle(it.pin).name,it.pin,it.shop,'JA',it.category||'',it.visits30d||0,checkTime,checks.length>0?'gecontroleerd':'niet gecontroleerd']);});}Object.keys(dayCtrlByShop).forEach(function(k){if(sampledShopKeys.has(k))return;dayCtrlByShop[k].forEach(function(c){rows.push([dkey,{ochtend:'Ochtend',middag:'Middag',nacht:'Nacht'}[getShift(c.ts)]||'',getRouteStyle(c.pin).name,c.pin,c.shop,'NEE','extra','',c.ts.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}),'extra controle']);});});}var csv='\uFEFF'+rows.map(function(r){return r.map(function(c){var s=String(c==null?'':c);return/[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(';');}).join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='audit-steekproef-'+today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0')+'-laatste'+N+'dgn.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}
+function printSample(){var day=(document.getElementById('sample-day')||{}).value;if(!day)return;var sample=_getSample(day);if(!sample){alert('Geen steekproef om te printen.');return;}var items=sample.items;var shiftOrder=['Ochtend','Middag','Nacht'];var routeOrder=['1118','2228','3338','4448','5558','6668'];var byShift={};items.forEach(function(it){var sl=it.shiftLabel||'Algemeen';if(!byShift[sl])byShift[sl]={};var rn=getRouteStyle(it.pin).name;if(!byShift[sl][rn])byShift[sl][rn]={color:getRouteStyle(it.pin).color,pin:it.pin,items:[]};byShift[sl][rn].items.push(it);});var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Steekproef - '+day+'</title><style>body{font-family:sans-serif;padding:24px;color:#1a2f1a;max-width:780px;margin:0 auto;background:#f5f7f0}h1{font-size:22px}.sub{color:#5a7a5a;font-size:13px;margin-bottom:24px}h2{font-size:14px;margin:24px 0 8px;border-bottom:2px solid #d5e0d0}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}ul{list-style:none;padding:0}li{padding:10px 14px;border-bottom:1px solid #e0e8da;display:flex;align-items:center;gap:12px;background:#f8faf5}.num{font-weight:600;color:#6a8a6a;min-width:24px}.shop{font-weight:500;flex:1}.check{width:26px;height:26px;border:2px solid #c5d5c0;border-radius:4px}.footer{margin-top:32px;padding:14px;background:#e8f0f0;border-radius:8px;font-size:12px}@media print{body{padding:12px}}</style></head><body><h1>🎲 Steekproef Controle - '+day+'</h1><div class="sub">⏱ Getrokken: '+new Date(sample.generatedAt).toLocaleString('nl-NL')+' · '+items.length+' winkels</div>';shiftOrder.forEach(function(shiftName){if(!byShift[shiftName])return;var shIcon={Ochtend:'☀️',Middag:'🌇',Nacht:'🌙'}[shiftName]||'';var totalInShift=Object.values(byShift[shiftName]).reduce(function(s,r){return s+r.items.length;},0);html+='<h2>'+shIcon+' '+shiftName+' <span style="color:#5a7a5a;font-size:13px;float:right">'+totalInShift+' winkels</span></h2>';var routesInShift=Object.entries(byShift[shiftName]).sort(function(a,b){var oa=routeOrder.indexOf(a[1].pin),ob=routeOrder.indexOf(b[1].pin);return(oa<0?99:oa)-(ob<0?99:ob);});routesInShift.forEach(function(entry){var routeName=entry[0],data=entry[1];html+='<h3 style="font-size:13px;margin:14px 0 4px;color:#5a7a5a"><span class="dot" style="background:'+data.color+'"></span> '+routeName+'</h3><ul>';data.items.forEach(function(it,i){var cat=it.category==='vaak'?'🔥':'⚠';html+='<li><span class="num">'+(i+1)+'.</span><span class="shop">'+it.shop+'</span><span style="color:#5a7a5a;font-size:11px">'+cat+' '+(it.visits30d||0)+'×/30d</span><span class="check"></span></li>';});html+='</ul>';});});html+='<div class="footer"><strong>📋 Instructie:</strong> Scan met pincode <strong>9999</strong> bij elke winkel hierboven.</div></body></html>';var w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(function(){w.print();},400);}
+
+// ============ REPORT ============
+function getMonthOptions(){if(!AD.length)return;var months=Array.from(new Set(AD.map(function(r){return r.ts.toISOString().slice(0,7);}))).sort();var sel=document.getElementById('rep-month');sel.innerHTML=months.map(function(m){return'<option value="'+m+'">'+m+'</option>';}).join('');sel.value=months[months.length-1];var weekKeys=Array.from(new Set(AD.map(function(r){return isoWeekKey(r.ts);}))).sort();var wsel=document.getElementById('rep-week');wsel.innerHTML=weekKeys.map(function(wk){var parts=wk.split('-W');var ws=isoWeekStart(+parts[0],+parts[1]),we=addDays(ws,6);return'<option value="'+wk+'">Wk '+(+parts[1])+' ('+fmtShort(ws)+' - '+fmtShort(we)+')</option>';}).join('');wsel.value=weekKeys[weekKeys.length-1];var days=Array.from(new Set(AD.map(function(r){return getOpDate(r.ts);}))).sort();var dsel=document.getElementById('rep-day');var dayNames=['Zo','Ma','Di','Wo','Do','Vr','Za'];dsel.innerHTML=days.map(function(d){var dt=new Date(d+'T12:00:00');return'<option value="'+d+'">'+dayNames[dt.getDay()]+' '+fmtShort(dt)+'</option>';}).join('');dsel.value=days[days.length-1];var rsel=document.getElementById('rep-route');var routes=Array.from(new Set(AD.map(function(r){return r.pin;}))).sort(function(a,b){return(ROUTE_ORDER.indexOf(a)<0?99:ROUTE_ORDER.indexOf(a))-(ROUTE_ORDER.indexOf(b)<0?99:ROUTE_ORDER.indexOf(b));});rsel.innerHTML='<option value="all">Alle routes</option>'+routes.map(function(r){return'<option value="'+r+'">'+getRouteStyle(r).name+' ('+r+')</option>';}).join('');}
+function renderReport(){if(!AD.length){document.getElementById('rep-content').innerHTML='<p style="color:#6a8a6a;padding:20px">📂 Upload eerst een CSV-bestand.</p>';return;}var period=getReportPeriod();if(!period){document.getElementById('rep-content').innerHTML='<p style="color:#6a8a6a;padding:20px">Selecteer een geldige periode.</p>';return;}var data=period.data.filter(function(r){return!isLiftScan(r.shop);});var repRoute=document.getElementById('rep-route').value;var th=+document.getElementById('th').value||45;var periodLabel=period.label;if(!data.length){document.getElementById('rep-content').innerHTML='<p style="color:#6a8a6a;padding:20px">Geen data voor deze selectie.</p>';return;}var byDate={};data.forEach(function(r){var d=getOpDate(r.ts);if(!byDate[d])byDate[d]={};if(!byDate[d][r.pin])byDate[d][r.pin]=[];byDate[d][r.pin].push(r);});var dates=Object.keys(byDate).sort();var byRoute={};data.forEach(function(r){if(!byRoute[r.pin])byRoute[r.pin]=[];byRoute[r.pin].push(r);});function countAlerts(scans,pin){var al=0;var sh=scans.length?getShift(scans[0].ts):'ochtend';var def=getRouteDef(pin,sh);for(var i=1;i<scans.length;i++){if(def&&spansBreak(scans[i-1].ts,scans[i].ts,def))continue;if((scans[i].ts-scans[i-1].ts)/60000>th)al++;}return al;}var totalScans=data.length;var totalAlerts=Object.keys(byRoute).reduce(function(s,k){var sorted=byRoute[k].sort(function(a,b){return a.ts-b.ts;});return s+countAlerts(sorted,k);},0);var totalNotes=data.filter(function(r){return r.note;}).length;var activeDays=dates.length;var avgPerDay=activeDays?Math.round(totalScans/activeDays):0;var ctrlScans=data.filter(function(s){return s.pin==='9999';});var totalCtrlScans=ctrlScans.length;var routeSummary=Object.keys(byRoute).map(function(k){var s=byRoute[k].sort(function(a,b){return a.ts-b.ts;});var sh=getShift(s[0].ts);var def=getRouteDef(k,sh);var exp=def?def.winkels.reduce(function(a,w){return a+w.r.length;},0)*activeDays:0;var al=countAlerts(s,k);var notes=s.filter(function(r){return r.note;}).length;var pct=exp>0?Math.min(100,Math.round(s.length/exp*100)):null;return{pin:k,name:getRouteStyle(k).name,color:getRouteStyle(k).color,scans:s.length,exp:exp,pct:pct,al:al,notes:notes};});var html='<div class="rep-stats"><div class="rsv"><div class="rsn blue">'+totalScans.toLocaleString('nl-NL')+'</div><div class="rsl">Totaal scans</div></div><div class="rsv"><div class="rsn">'+avgPerDay+'</div><div class="rsl">Gem. scans/dag</div></div><div class="rsv"><div class="rsn red">'+totalAlerts+'</div><div class="rsl">Totaal alerts</div></div><div class="rsv"><div class="rsn" style="color:#5a2d88">'+totalNotes+'</div><div class="rsl">Opmerkingen</div></div><div class="rsv"><div class="rsn" style="color:#6a3d8a">'+totalCtrlScans+'</div><div class="rsl">Controles</div></div></div>';html+='<div class="rep-section"><div class="rep-sh"><h3>🗺 Samenvatting per route</h3></div><div class="rep-body" style="padding:0"><table class="rep-table"><thead><tr><th>Route</th><th>Scans</th><th>Voortgang</th><th>Alerts</th><th>Opmerkingen</th></tr></thead><tbody>'+routeSummary.map(function(r){return'<tr data-route="'+r.pin+'"><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+r.color+';margin-right:5px"></span>'+r.name+'</td><td>'+r.scans.toLocaleString('nl-NL')+'</td><td><div class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:'+(r.pct||0)+'%;background:'+((r.pct||0)>=90?'#2d8a40':(r.pct||0)>60?'#b87820':'#3d6a8a')+'"></div></div><span style="font-size:10px;color:#5a7a5a">'+(r.pct!=null?r.pct+'%':'-')+'</span></div></td><td>'+(r.al>0?'<span class="abadge">⚠ '+r.al+'</span>':'<span class="gbadge">✓ 0</span>')+'</td><td>'+(r.notes>0?'<span style="color:#5a2d88">📝 '+r.notes+'</span>':'-')+'</td></tr>';}).join('')+'</tbody></table></div></div>';document.getElementById('rep-content').innerHTML=html;}
+function getReportPeriod(){var type=document.getElementById('rep-period').value;var repRoute=document.getElementById('rep-route').value;var data,label;if(type==='day'){var dayKey=document.getElementById('rep-day').value;if(!dayKey)return null;data=AD.filter(function(r){return getOpDate(r.ts)===dayKey&&!isLiftScan(r.shop);});var dayDate=new Date(dayKey+'T12:00:00');var dayNms=['Zo','Ma','Di','Wo','Do','Vr','Za'];label=dayNms[dayDate.getDay()]+' '+fmtShort(dayDate)+'/'+dayDate.getFullYear();}else if(type==='week'){var wkKey=document.getElementById('rep-week').value;if(!wkKey)return null;var parts=wkKey.split('-W');var wkNum=parseInt(parts[1],10),yr=parseInt(parts[0],10);var ws=isoWeekStart(yr,wkNum),we=addDays(ws,6);var wsKey=gds(ws),weKey=gds(we);data=AD.filter(function(r){var d=getOpDate(r.ts);return d>=wsKey&&d<=weKey&&!isLiftScan(r.shop);});label='Week '+wkNum+' ('+fmtShort(ws)+' - '+fmtShort(we)+')';}else{var month=document.getElementById('rep-month').value;if(!month)return null;data=AD.filter(function(r){return r.ts.toISOString().startsWith(month)&&!isLiftScan(r.shop);});label=month;}if(repRoute!=='all'){data=data.filter(function(r){return r.pin===repRoute;});}return{data:data,label:label,type:type};}
+function exportCSV(){if(!AD.length)return;var period=getReportPeriod();if(!period){alert('Selecteer een geldige periode.');return;}var data=period.data;var th=+document.getElementById('th').value||45;if(!data.length){alert('Geen data voor deze selectie.');return;}var byDate={};data.forEach(function(r){var d=getOpDate(r.ts);if(!byDate[d])byDate[d]={};if(!byDate[d][r.pin])byDate[d][r.pin]=[];byDate[d][r.pin].push(r);});var rows=[['Datum','Route','Pincode','Dienst','Scans','Alerts','Opmerkingen']];Object.keys(byDate).sort().forEach(function(d){Object.keys(byDate[d]).forEach(function(k){var s=byDate[d][k].sort(function(a,b){return a.ts-b.ts;});var sh=getShift(s[0].ts);var def=getRouteDef(k,sh);var al=0;for(var i=1;i<s.length;i++){if(def&&spansBreak(s[i-1].ts,s[i].ts,def))continue;if((s[i].ts-s[i-1].ts)/60000>th)al++;}var notes=s.filter(function(r){return r.note;}).length;rows.push([d,getRouteStyle(k).name,k,sh,s.length,al,notes]);});});var csv=rows.map(function(r){return r.map(function(v){return'"'+v+'"';}).join(',');}).join('\n');var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Renewi_Rapportage_'+period.label.replace(/[^0-9A-Za-z_-]/g,'_')+'.csv';a.click();}
+function isoWeekKey(d){var date=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));var dayNum=date.getUTCDay()||7;date.setUTCDate(date.getUTCDate()+4-dayNum);var yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1));var weekNum=Math.ceil((((date-yearStart)/86400000)+1)/7);return date.getUTCFullYear()+'-W'+String(weekNum).padStart(2,'0');}
+function isoWeekStart(year,weekNum){var jan4=new Date(year,0,4);var jan4Day=jan4.getDay()||7;var wk1Mon=new Date(year,0,4-(jan4Day-1));return new Date(wk1Mon.getFullYear(),wk1Mon.getMonth(),wk1Mon.getDate()+(weekNum-1)*7);}
+
+// ============ LOAD & FETCH ============
+function load(txt,fn){AD=parse(txt);reassignPinsByShopName(AD);if(!AD.length){alert('Geen geldige data gevonden.');return;}var dates=Array.from(new Set(AD.map(function(r){return getOpDate(r.ts);}))).sort();document.getElementById('df').value=dates[dates.length-1];var routes=Array.from(new Set(AD.map(function(r){return r.pin;}))).sort(function(a,b){return(ROUTE_ORDER.indexOf(a)<0?99:ROUTE_ORDER.indexOf(a))-(ROUTE_ORDER.indexOf(b)<0?99:ROUTE_ORDER.indexOf(b));});document.getElementById('rf').innerHTML='<option value="all">Alle routes</option>'+routes.map(function(r){return'<option value="'+r+'">'+getRouteStyle(r).name+' ('+r+')</option>';}).join('');document.getElementById('subtitle').textContent=AD.length.toLocaleString('nl-NL')+' scans geladen · '+fn;document.getElementById('lu').textContent='Bijgewerkt: '+new Date().toLocaleTimeString('nl-NL');render();getMonthOptions();if(document.getElementById('sample-view').style.display!=='none')renderSample();}
+var _refreshTimer=null;
+function setStatus(msg,color){var el=document.getElementById('cstat');if(!el)return;el.textContent=msg||'';el.style.color=color||'#6a8a6a';}
+async function fetchFromUrl(silent){var url=document.getElementById('curl').value.trim();if(!url){if(!silent)alert('Geen URL ingevuld.');return;}setStatus('⏳ Ophalen...','#3d6a8a');try{var resp=await fetch(url,{cache:'no-store'});if(!resp.ok)throw new Error('HTTP '+resp.status);var buf=await resp.arrayBuffer();var txt;try{txt=new TextDecoder('utf-8',{fatal:false}).decode(buf);if(/Ã©|Ã«|Ã¨|Â/.test(txt.slice(0,4000))){txt=new TextDecoder('windows-1252').decode(buf);}}catch(e){txt=new TextDecoder('windows-1252').decode(buf);}var fn=url.split('/').pop().split('?')[0]||'url-data.csv';load(txt,fn);setStatus('✓ '+new Date().toLocaleTimeString('nl-NL'),'#2d8a40');try{localStorage.setItem('scanDash_url',url);}catch(e){}}catch(err){setStatus('✗ '+(err.message||'fout'),'#b84030');}}
+function setupAutoRefresh(){if(_refreshTimer){clearInterval(_refreshTimer);_refreshTimer=null;}if(document.getElementById('cauto').checked){var sec=parseInt(document.getElementById('cint').value,10)||300;_refreshTimer=setInterval(function(){fetchFromUrl(true);},sec*1000);try{localStorage.setItem('scanDash_auto','1');localStorage.setItem('scanDash_int',sec);}catch(e){}}else{try{localStorage.setItem('scanDash_auto','0');}catch(e){}}}
+
+// ============ MSAL ============
+var _msalInstance=null;var _msalAccount=null;
+function getMsalConfig(){try{return JSON.parse(localStorage.getItem('scanDash_msal')||'{}');}catch(e){return{};}}
+function saveMsalConfig(cfg){try{localStorage.setItem('scanDash_msal',JSON.stringify(cfg));}catch(e){}}
+function initMsal(){var cfg=getMsalConfig();if(!cfg.clientId){return null;}if(_msalInstance&&_msalInstance._currentClientId===cfg.clientId){return _msalInstance;}_msalInstance=new msal.PublicClientApplication({auth:{clientId:cfg.clientId,authority:'https://login.microsoftonline.com/'+(cfg.tenantId||'common'),redirectUri:window.location.origin+window.location.pathname},cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}});_msalInstance._currentClientId=cfg.clientId;return _msalInstance;}
+async function msalLogin(){var inst=initMsal();if(!inst){alert('Geen Client ID ingesteld.');return null;}await inst.initialize();var scopes=['Files.Read.All','User.Read'];var account=inst.getAllAccounts()[0];if(!account){try{var resp=await inst.loginPopup({scopes:scopes,prompt:'select_account'});account=resp.account;}catch(e){setStatus('✗ Login geannuleerd','#b84030');return null;}}_msalAccount=account;document.getElementById('msbtn').innerHTML='<svg width="12" height="12" viewBox="0 0 23 23"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg> '+account.username.split('@')[0];return account;}
+async function getGraphToken(){var inst=initMsal();if(!inst)return null;await inst.initialize();var account=_msalAccount||inst.getAllAccounts()[0];if(!account){return await msalLogin().then(function(a){return a?getGraphToken():null;});}try{var resp=await inst.acquireTokenSilent({account:account,scopes:['Files.Read.All']});return resp.accessToken;}catch(e){var resp=await inst.acquireTokenPopup({scopes:['Files.Read.All']});return resp.accessToken;}}
+async function fetchViaGraph(silent){var cfg=getMsalConfig();if(!cfg.clientId||!cfg.fileUrl){if(!silent)alert('Configureer eerst Client ID en bestand-pad via ⚙.');return;}setStatus('⏳ Graph fetch...','#3d6a8a');try{var token=await getGraphToken();if(!token)return;var url='https://graph.microsoft.com/v1.0'+cfg.fileUrl;var resp=await fetch(url,{headers:{Authorization:'Bearer '+token}});if(!resp.ok)throw new Error('Graph error: '+resp.status);var buf=await resp.arrayBuffer();var wb=XLSX.read(buf,{type:'array'});var sheet=wb.Sheets[wb.SheetNames[0]];var csv=XLSX.utils.sheet_to_csv(sheet);load(csv,'graph:'+(cfg.fileUrl.split('/').pop()||'file.xlsx'));setStatus('✓ Graph '+new Date().toLocaleTimeString('nl-NL'),'#2d8a40');}catch(err){setStatus('✗ '+(err.message||'fout').slice(0,80),'#b84030');}}
+
+// ============ EVENT LISTENERS ============
+document.getElementById('fu').addEventListener('change',function(e){var f=e.target.files[0];if(!f)return;var nm=(f.name||'').toLowerCase();
+  if(nm.slice(-5)==='.xlsx'||nm.slice(-4)==='.xls'){ ecoHandleFileToDashboard(f); return; }
+  var r=new FileReader();r.onload=function(ev){var txt=ev.target.result;
+    if(isEcoSmartText(txt)){ ECO_ROWS=ecoParseCSV(txt); ecoConvert(); ecoLoadIntoDashboard(); }
+    else { load(txt,f.name); }
+  };r.readAsText(f,'utf-8');});
+document.getElementById('cbtn').addEventListener('click',function(){fetchFromUrl(false);});
+document.getElementById('cauto').addEventListener('change',setupAutoRefresh);
+document.getElementById('cint').addEventListener('change',setupAutoRefresh);
+document.getElementById('curl').addEventListener('keydown',function(e){if(e.key==='Enter')fetchFromUrl(false);});
+document.getElementById('msbtn').addEventListener('click',async function(){var cfg=getMsalConfig();if(!cfg.clientId){document.getElementById('msmodal').style.display='flex';document.getElementById('redirurl').textContent=window.location.origin+window.location.pathname;return;}await fetchViaGraph(false);});
+document.getElementById('msconf').addEventListener('click',function(){var cfg=getMsalConfig();document.getElementById('mscid').value=cfg.clientId||'';document.getElementById('mstid').value=cfg.tenantId||'common';document.getElementById('msurl').value=cfg.fileUrl||'';document.getElementById('redirurl').textContent=window.location.origin+window.location.pathname;document.getElementById('msmodal').style.display='flex';});
+document.getElementById('mscancel').addEventListener('click',function(){document.getElementById('msmodal').style.display='none';});
+document.getElementById('mssave').addEventListener('click',async function(){var cfg={clientId:document.getElementById('mscid').value.trim(),tenantId:document.getElementById('mstid').value.trim()||'common',fileUrl:document.getElementById('msurl').value.trim()};if(!cfg.clientId){alert('Client ID verplicht.');return;}if(!cfg.fileUrl.startsWith('/')){alert('Graph pad moet beginnen met "/"');return;}saveMsalConfig(cfg);_msalInstance=null;document.getElementById('msmodal').style.display='none';await fetchViaGraph(false);});
+document.getElementById('msinfo').addEventListener('click',function(e){e.preventDefault();var box=document.getElementById('msinfobox');box.style.display=box.style.display==='none'?'block':'none';});
+['rf','sf','df','th'].forEach(function(id){document.getElementById(id).addEventListener('change',function(){render();});});
+document.getElementById('rep-period').addEventListener('change',function(){var t=this.value;document.getElementById('rep-month-wrap').style.display=t==='month'?'':'none';document.getElementById('rep-week-wrap').style.display=t==='week'?'':'none';document.getElementById('rep-day-wrap').style.display=t==='day'?'':'none';if(AD.length)renderReport();});
+document.getElementById('rep-day').addEventListener('change',function(){if(AD.length)renderReport();});
+document.getElementById('rep-week').addEventListener('change',function(){if(AD.length)renderReport();});
+document.getElementById('rep-month').addEventListener('change',function(){if(AD.length)renderReport();});
+document.getElementById('rep-route').addEventListener('change',function(){if(AD.length)renderReport();});
+(function restoreUrl(){try{var u=localStorage.getItem('scanDash_url');var a=localStorage.getItem('scanDash_auto')==='1';var i=parseInt(localStorage.getItem('scanDash_int')||'300',10);if(u)document.getElementById('curl').value=u;if(a)document.getElementById('cauto').checked=true;if(i)document.getElementById('cint').value=i;if(u&&a){setTimeout(function(){fetchFromUrl(true);},300);setupAutoRefresh();}}catch(e){}})();
+(function restoreGraph(){var cfg=getMsalConfig();if(cfg.clientId&&cfg.fileUrl){document.getElementById('msbtn').style.borderColor='#5a2d88';document.getElementById('msbtn').style.color='#5a2d88';if(document.getElementById('cauto').checked){setTimeout(function(){fetchViaGraph(true);},1000);}}})();
+setInterval(function(){updateShiftBar();if(AD.length)render();},60000);
+updateShiftBar();
+
+
+// ===== EcoSmart import =====
+var ECO_ROWS=null, ECO_CONVERTED=null;
+var ECO_ALIAS={
+  'klm lounge 52':'L3-KLM-52','klm lounge 52 polder':'L3-Polder','klm lounge 25':'L1-KLM-Lounge-25',
+  'street food market':'L2-Streetfood','east bar & bites':'F-pier-East-Bar',
+  'vip lounge':'Plaza-VIP-center','carluccio\'s lounge 3':'L3-Carluccios',
+  'heineken bar':'D-pier-Heineken-Bar','panorama restaurant':'Plaza-Panorama-Terras',
+  'murphy\'s':'D-pier-Murphy\'s-Pub','grab & fly d pier 2.0':'D-pier-Grab-Fly',
+  'city spoel':'L3-City-Spoel','polder':'L3-Polder','ef-filter':'EF-Filter'
+};
+var ECO_LOCPREF={'Terminal 1':['L1'],'Terminal 2':['L2'],'Terminal 3':['L3','L4','HB'],
+  'Terminal 2/EF gebied':['L2','HB'],'Plaza':['Plaza'],'D-pier':['D-pier'],'E-pier':['E-pier'],
+  'F-pier':['F-pier'],'G-pier':['G-pier'],'B-pier':['B-pier'],'C-pier':['C-pier'],'BC-corridor':['B-pier','C-pier']};
+
+function ecoCore(x){
+  var s=(x||'').toLowerCase();
+  ['plaza','lounge 1','lounge 2','lounge 3','lounge 4','lounge','d pier 2.0','d pier','c-pier','c pier','e pier','f pier','g pier','b pier','the pavillion','arrivals','aankomst','vertrek','2.0','&','-'].forEach(function(j){ s=s.split(j).join(' '); });
+  s=s.replace(/\d+/g,' ').replace(/[^a-z ]/g,' ');
+  var out={}; s.split(/\s+/).forEach(function(t){ if(t.length>1) out[t]=1; }); return out;
+}
+function ecoPrefixOf(k){ var m=(k||'').match(/^(L\d|HB|Plaza|[A-G]-pier)/); return m?m[1]:''; }
+function ecoShopVocab(){
+  var v=[]; Object.keys(RM).forEach(function(p){ if(p==='9999')return; ['dag','avond','nacht'].forEach(function(sh){ (RM[p][sh]&&RM[p][sh].winkels||[]).forEach(function(w){ v.push({n:w.n,pin:p}); }); }); });
+  return v;
+}
+// expliciete koppelingen met vaste route (ook als winkel niet in het plan staat)
+var ECO_FORCE={
+  'klm lounge 52':{shop:'L3-KLM-52',pin:'6668'},
+  'grab & fly d pier 2.0':{shop:'D-pier-Grab-Fly',pin:'2228'},
+  'grab & fly d pier':{shop:'D-pier-Grab-Fly',pin:'2228'}
+  // 'vip lounge' wordt tijd-afhankelijk afgehandeld (KLM overdag, Nacht 's nachts)
+};
+var ECO_MAPPING={
+'b-pier||dammers tap':{n:'B-pier-Dammers-Tap',p:'1118'},
+'b-pier||grab & fly b pier':{n:'B-pier-Grab-Fly',p:'1118'},
+'b-pier||karton verzamelpunt b pier':{n:'B-pier-Karton-Verzamelpunt',p:'1118'},
+'b-pier||kiosk b29':{n:'B-pier-Kiosk-29',p:'1118'},
+'b-pier||kiosk bus stop b - pier':{n:'B-pier-Kiosk-koffiepunt',p:'1118'},
+'b-pier||koffiesalon b15':{n:'B-pier-Koffiesalon-Car',p:'1118'},
+'bc-corridor||starbucks bc-pier':{n:'C-pier-Starbucks',p:'1118'},
+'c-pier||cafe comunal':{n:'C-pier-Comunal',p:'1118'},
+'c-pier||karton verzamelpunt c pier':{n:'C-pier-Karton-Verzamelpunt',p:'1118'},
+'c-pier||kiosco comunal':{n:'C-pier-Kiosco',p:'1118'},
+'d-pier||café flor':{n:'D-pier-Cafe-Flor',p:'2228'},
+'d-pier||grab & fly d pier 2.0':{n:'D-pier-Grab-Fly',p:'2228'},
+'d-pier||harvest market':{n:'D-pier-Harvest-Market',p:'2228'},
+'d-pier||murphy\'s':{n:'D-pier-Murphy\'s-Pub',p:'2228'},
+'d-pier||stach d pier':{n:'D-pier-Stach',p:'2228'},
+'d-pier||starbucks d pier':{n:'D-pier-Starbucks',p:'2228'},
+'e-pier||cafe olea':{n:'E-pier-Cafe-Olea',p:'3338'},
+'e-pier||grab & fly e pier':{n:'E-pier-Grab-Fly',p:'3338'},
+'e-pier||silverscreen':{n:'E-pier-Silverscreen',p:'3338'},
+'f-pier||grab & fly f pier':{n:'F-pier-Grab-Fly',p:'3338'},
+'f-pier||moods':{n:'F-pier-Moods',p:'3338'},
+'f-pier||the butcher':{n:'F-pier-The-Butcher',p:'3338'},
+'g-pier||grab & fly g pier 2.0':{n:'G-pier-Grab-Fly',p:'3338'},
+'g-pier||kiosk g05':{n:'G-pier-Kiosk',p:'3338'},
+'g-pier||pana':{n:'G-pier-Pana',p:'3338'},
+'g-pier||verzamelpunt karton g pier':{n:'G-pier-Karton-Verzamelpunt',p:'3338'},
+'plaza||ah to go - aankomst 1':{n:'Plaza-AH-to-Go-A2',p:'4448'},
+'plaza||ah to go - aankomst 2':{n:'Plaza-AH-to-Go-A2',p:'4448'},
+'plaza||ah to go - aankomst 4':{n:'Plaza-AH-to-Go-A4',p:'4448'},
+'plaza||albert heijn':{n:'Plaza-Albert-Heijn',p:'4448'},
+'plaza||bloem aankomst 2':{n:'Plaza-Bloem-A2',p:'4448'},
+'plaza||bloem aankomst 3':{n:'Plaza-Bloem-A3',p:'4448'},
+'plaza||bloem aankomst 4':{n:'Plaza-Bloem-A4',p:'4448'},
+'plaza||bps':{n:'Plaza-BPS',p:'4448'},
+'plaza||burger king':{n:'Plaza-Burger-King',p:'4448'},
+'plaza||cafe rembrandt':{n:'Plaza-Cafe-Rembrandt',p:'4448'},
+'plaza||crossroads':{n:'Plaza-Crossroads',p:'4448'},
+'plaza||douwe egberts west':{n:'Plaza-Douwe-Egberts-D3',p:'4448'},
+'plaza||febo':{n:'Plaza-FEBO',p:'4448'},
+'plaza||grand café plaz':{n:'Plaza-Grand-Cafe-A3',p:'4448'},
+'plaza||grand cafe plaza':{n:'Plaza-Grand-Cafe-A3',p:'4448'},
+'plaza||hello goodbye bar':{n:'Plaza-Hello-Goodbye-Bar',p:'4448'},
+'plaza||hema food':{n:'Plaza-Hema',p:'4448'},
+'plaza||hema retail - schiphol plaza':{n:'Plaza-Hema',p:'4448'},
+'plaza||koekemannetje':{n:'Plaza-Koekemannetje',p:'4448'},
+'plaza||koffiesalon plaza aankomst 2':{n:'Plaza-Koffiesalon-A2',p:'4448'},
+'plaza||la place express':{n:'Plaza-La-Place-Express',p:'4448'},
+'plaza||la place plaza':{n:'Plaza-La-Place-Resto',p:'4448'},
+'plaza||la place plaza zitgebied':{n:'Plaza-La-Place-Resto',p:'4448'},
+'plaza||leon plaza':{n:'Plaza-Leon',p:'4448'},
+'plaza||old amsterdam':{n:'Plaza-Old-Amsterdam',p:'4448'},
+'plaza||per tutti':{n:'Plaza-Per-Tutti',p:'4448'},
+'plaza||poké perfect':{n:'Plaza-Poke-Perfect-A1',p:'4448'},
+'plaza||privium lounge plaza':{n:'Plaza-Privium',p:'4448'},
+'plaza||stach plaza':{n:'Plaza-Stach',p:'4448'},
+'plaza||stach plaza':{n:'Plaza-Stach',p:'4448'},
+'plaza||starbucks arrival 1':{n:'Plaza-Starbucks-A1',p:'4448'},
+'plaza||starbucks arrivals 4':{n:'Plaza-Starbucks-A4',p:'4448'},
+'plaza||starbucks plaza':{n:'Plaza-Starbucks',p:'4448'},
+'plaza||up to do good':{n:'Plaza-Up-to-do-Good/Koffiesalon',p:'4448'},
+'plaza||vip lounge':{n:'Plaza-VIP-center',p:'6668'},
+'plaza||wing stop':{n:'Plaza-Wing-Stop',p:'4448'},
+'terminal 1||burger king lounge 1':{n:'L1-Burger-King',p:'1118'},
+'terminal 1||deli salon':{n:'L1-Deli-Salon',p:'1118'},
+'terminal 1||eataly':{n:'L1-Eataly',p:'1118'},
+'terminal 1||grab & fly c-pier':{n:'C-pier-Grab-Fly',p:'1118'},
+'terminal 1||klm lounge 25':{n:'L1-KLM-25',p:'6668'},
+'terminal 1||koekemannetje lounge 1':{n:'L1-Koekemannetje',p:'1118'},
+'terminal 1||koffiesalon lounge 1':{n:'L1-Koffiesalon-Resto',p:'1118'},
+'terminal 1||la place express lounge 1':{n:'L1-La-Place',p:'1118'},
+'terminal 1||leon lounge 1':{n:'L1-Leon',p:'1118'},
+'terminal 1||loaf':{n:'L1-LOAF',p:'1118'},
+'terminal 1||panorama restaurant':{n:'Plaza-Panorama-Restaurant',p:'4448'},
+'terminal 1||park cafe':{n:'L1-Park-Cafe',p:'2228'},
+'terminal 1||privium lounge 28':{n:'L1-Privium-28',p:'2228'},
+'terminal 1||starbucks lounge 1':{n:'L1-Starbucks',p:'1118'},
+'terminal 1||the upper floor bar':{n:'L1-De-Bar',p:'1118'},
+'terminal 1||the wanderer':{n:'L1-The-Wanderer',p:'1118'},
+'terminal 1||two tigers':{n:'L1-Two-Tigers',p:'1118'},
+'terminal 1||urban beans vertrek 1':{n:'Plaza-Urban-Beans-D1',p:'4448'},
+'terminal 2||amsterdam bread company':{n:'L2-Amsterdam-Bread-Company',p:'2228'},
+'terminal 2||aspire lounge 26':{n:'L1-Aspire-26',p:'2228'},
+'terminal 2||aspire lounge 41':{n:'L2-Aspire-41',p:'2228'},
+'terminal 2||bubbles lounge 2':{n:'L2-Bubbles',p:'2228'},
+'terminal 2||frames bar & bites':{n:'L2-Frames',p:'2228'},
+'terminal 2||gucci':{n:'L2-Gucci',p:'2228'},
+'terminal 2||heineken bar':{n:'D-pier-Heineken-Bar',p:'2228'},
+'terminal 2||kiosk sushi & noodles':{n:'L2-Sushi-',p:'2228'},
+'terminal 2||lavazza lounge 2':{n:'L2-Lavazza',p:'2228'},
+'terminal 2||lift 13/14':{n:'L2-Lift-13-14',p:'2228'},
+'terminal 2||louis vuitton':{n:'L2-Louis-Vuitton',p:'2228'},
+'terminal 2||mcdonalds lounge 2':{n:'L2-MCDonalds',p:'2228'},
+'terminal 2||starbucks the pavillion':{n:'L2-Starbucks',p:'2228'},
+'terminal 2||street food market':{n:'L2-Streetfood-the-oven-the-grill',p:'2228'},
+'terminal 2/ef gebied||dutch kitchen & dutch bar':{n:'HB-Dutch-Kitchen',p:'3338'},
+'terminal 2/ef gebied||kebaya':{n:'HB-Kebaya',p:'3338'},
+'terminal 2/ef gebied||privium west':{n:'L2-Privium-West',p:'3338'},
+'terminal 2/ef gebied||stach corner':{n:'HB-Stach-Corner',p:'3338'},
+'terminal 3||birra moretti':{n:'L4-Birra-Moretti',p:'3338'},
+'terminal 3||bread!':{n:'L3-Bread',p:'3338'},
+'terminal 3||carluccio\'s lounge 3':{n:'L3-Carluccios',p:'3338'},
+'terminal 3||douwe egberts west':{n:'Plaza-Douwe-Egberts-D3',p:'4448'},
+'terminal 3||east bar & bites':{n:'F-pier-East-Bar',p:'3338'},
+'terminal 3||joe & the juice':{n:'L3-Joe-and-Juice',p:'3338'},
+'terminal 3||karton verzamelpunt lounge 4':{n:'L4-Karton-verzamelpunt',p:'3338'},
+'terminal 3||klm lounge 52':{n:'L3-KLM-52',p:'6668'},
+'terminal 3||mcdonalds lounge west':{n:'L3-MCDonalds',p:'3338'},
+'terminal 3||stach lounge 4':{n:'L4-Stach',p:'3338'},
+'terminal 3||starbucks lounge 3':{n:'L3-Starbucks',p:'3338'},
+'terminal 3||urban beans arr. 3':{n:'Plaza-Urban-Beans-A3',p:'4448'},
+'terminal 3||urban beans vertrek 4':{n:'Plaza-Urban-Beans-D4',p:'4448'},
+'terminal 3||urban food market':{n:'L4-Urban-Food-Market',p:'3338'},
+'terminal 3||vit':{n:'L3-VIT',p:'3338'},
+'terminal 3||klm lounge 52 polder':{n:'L3-KLM-52-Polder',p:'6668'},
+'plaza||burger king plaza (atm)':{n:'Plaza-Burger-King',p:'4448'},
+'plaza||urban beans aankomst 3':{n:'Plaza-Urban-Beans-A3',p:'4448'},
+'plaza||starbucks - aankomst 4':{n:'Plaza-Starbucks-A4',p:'4448'},
+'plaza||starbucks - aankomst 1':{n:'Plaza-Starbucks-A1',p:'4448'},
+'plaza||bloem - aankomst 4':{n:'Plaza-Bloem-A4',p:'4448'},
+'terminal 3||douwe egberts west - vertrek 3':{n:'Plaza-Douwe-Egberts-D3',p:'4448'},
+'plaza||bloem - aankomst 3':{n:'Plaza-Bloem-A3',p:'4448'},
+'plaza||grand café plaza':{n:'Plaza-Grand-Cafe-A3',p:'4448'},
+'plaza||bloem - aankomst 2':{n:'Plaza-Bloem-A2',p:'4448'},
+'plaza||koffiesalon plaza - aankomst 2':{n:'Plaza-Koffiesalon-A2',p:'4448'},
+'terminal 2/ef gebied||privium lounge west':{n:'L2-Privium-West',p:'3338'},
+'terminal 1||privium lounge 1':{n:'L1-Privium-South',p:'1118'},
+'terminal 1||privium lounge 28':{n:'L1-Privium-28',p:'2228'},
+'b-pier||koffiesalon car b15':{n:'B-pier-Koffiesalon-Car',p:'1118'},
+'plaza||zero-zero':{n:'Plaza - Zero-zero',p:'4448'},
+'terminal 3||amex lounge':{n:'L3-Amex-Lounge',p:'3338'}
+};
+function ecoMatch(loc,sub,ts){
+  if(!sub) return null;
+  var key=((loc||'')+'||'+(sub||'')).toLowerCase().trim();
+  var subl=(sub||'').toLowerCase().trim();
+  if(subl==='lift 13/14'||subl==='lift 13/14 '||subl.indexOf('lift 13')>=0) return {excl:true};
+  var hit=ECO_MAPPING[key];
+  // fallback: alleen op sub-location matchen als loc niet exact klopt
+  if(!hit){ for(var k in ECO_MAPPING){ if(k.split('||')[1]===subl){ hit=ECO_MAPPING[k]; break; } } }
+  if(!hit) return null;
+  var basePin=hit.p;
+  // Dienst op tijd: nacht-scan -> Nacht-route (5558), anders basisroute
+  var sh=ts?getShift(ts):'ochtend';
+  var pin = (sh==='nacht') ? '5558' : basePin;
+  return {shop:hit.n, pin:pin};
+}
+
+function ecoColIndex(hdr,names){ for(var i=0;i<hdr.length;i++){ var h=hdr[i].replace(/[\s\-_]/g,''); for(var j=0;j<names.length;j++){ if(h.indexOf(names[j])>=0) return i; } } return -1; }
+function ecoRowsFromMatrix(json){
+  if(!json.length) return [];
+  var hdr=json[0].map(function(h){return (h||'').toString().toLowerCase();});
+  var iDate=ecoColIndex(hdr,['visitdate','datum','tijdstip','date']),
+      iLoc=ecoColIndex(hdr,['location','locatie']),
+      iSub=ecoColIndex(hdr,['sublocation','subloc']),
+      iWaste=ecoColIndex(hdr,['waste','afval']),
+      iUser=ecoColIndex(hdr,['user','gebruiker']),
+      iSrc=ecoColIndex(hdr,['registrationsource','source','bron']),
+      iCode=ecoColIndex(hdr,['scannedcode','code']);
+  if(iDate<0)iDate=0; if(iLoc<0)iLoc=2; if(iSub<0)iSub=3;
+  var rows=[];
+  for(var r=1;r<json.length;r++){
+    var row=json[r]; if(!row||row[iDate]==null||row[iDate]==='') continue;
+    rows.push({ date:row[iDate], loc:(iLoc>=0?row[iLoc]:'')||'', sub:(iSub>=0?row[iSub]:'')||'',
+      waste:(iWaste>=0?row[iWaste]:'')||'', user:(iUser>=0?row[iUser]:'')||'', src:(iSrc>=0?row[iSrc]:'')||'', code:(iCode>=0?row[iCode]:'')||'' });
+  }
+  return rows;
+}
+function ecoParseCSV(text){
+  text=text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  var lines=text.split('\n').filter(function(l){return l.length>0;});
+  if(lines.length<2) return [];
+  var delim=(lines[0].split(';').length > lines[0].split(',').length) ? ';' : ',';
+  function pl(l){ var res=[],cur='',q=false; for(var i=0;i<l.length;i++){ var ch=l[i]; if(ch==='"'){q=!q;} else if(ch===delim&&!q){res.push(cur);cur='';} else cur+=ch; } res.push(cur); return res.map(function(x){return x.trim();}); }
+  var matrix=lines.map(pl);
+  return ecoRowsFromMatrix(matrix);
+}
+function ecoHandleFile(file){
+  var name=(file.name||'').toLowerCase();
+  var reader=new FileReader();
+  if(name.slice(-4)==='.csv'){
+    reader.onload=function(ev){
+      try{ ECO_ROWS=ecoParseCSV(ev.target.result); if(!ECO_ROWS.length){alert('Geen rijen gevonden in CSV.');return;} renderEco(); }
+      catch(err){ alert('Kon EcoSmart CSV niet lezen: '+err.message); console.error(err); }
+    };
+    reader.readAsText(file,'utf-8');
+  } else {
+    reader.onload=function(ev){
+      try{
+        if(typeof XLSX==='undefined'){ alert('Excel-bibliotheek nog niet geladen — probeer opnieuw, of upload een .csv.'); return; }
+        var wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array',cellDates:true});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var json=XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
+        ECO_ROWS=ecoRowsFromMatrix(json);
+        if(!ECO_ROWS.length){alert('Geen rijen gevonden in Excel.');return;}
+        renderEco();
+      }catch(err){ alert('Kon EcoSmart-bestand niet lezen: '+err.message); console.error(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function ecoParseDate(v){
+  if(v instanceof Date) return v;
+  var s=(v||'').toString().trim().replace(' ','T');
+  var d=new Date(s);
+  return isNaN(d)?null:d;
+}
+
+function ecoConvert(){
+  if(!ECO_ROWS) return null;
+  var out=[], stats={total:0,matched:0,excl:0,unmatched:0,unmatchedList:{}};
+  ECO_ROWS.forEach(function(r){
+    stats.total++;
+    var ts=ecoParseDate(r.date); if(!ts) return;
+    var m=ecoMatch(r.loc,r.sub,ts);
+    if(m&&m.excl){ stats.excl++; return; }
+    var shop, pin;
+    if(m){ shop=m.shop; pin=m.pin; stats.matched++; }
+    else { shop=(r.loc?r.loc+'-':'')+(r.sub||'onbekend').replace(/\s+/g,'-'); pin='0000'; stats.unmatched++; stats.unmatchedList[r.loc+' | '+r.sub]=(stats.unmatchedList[r.loc+' | '+r.sub]||0)+1; }
+    var note=r.src==='Manual'?'Handmatig':''; if((r.waste||'').toLowerCase()==='yes') note=(note?note+' · ':'')+'Afval opgehaald';
+    out.push({ts:ts,shop:shop,pin:pin,note:note});
+  });
+  ECO_CONVERTED=out;
+  return stats;
+}
+
+function isEcoSmartText(txt){ var head=(txt||'').slice(0,400).toLowerCase().replace(/[\s\-_]/g,''); return head.indexOf('sublocation')>=0 || (head.indexOf('visitdate')>=0 && head.indexOf('location')>=0) || head.indexOf('registrationsource')>=0; }
+function ecoHandleFileToDashboard(file){
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      if(typeof XLSX==='undefined'){ alert('Excel-bibliotheek nog niet geladen — probeer opnieuw of upload de .csv.'); return; }
+      var wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array',cellDates:true});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      ECO_ROWS=ecoRowsFromMatrix(XLSX.utils.sheet_to_json(ws,{header:1,raw:false}));
+      if(!ECO_ROWS.length){alert('Geen rijen gevonden.');return;}
+      ecoConvert(); ecoLoadIntoDashboard();
+    }catch(err){ alert('Kon EcoSmart-bestand niet lezen: '+err.message); console.error(err); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function renderEco(){
+  var root=document.getElementById('eco-view'); if(!root) return;
+  var stats=ECO_ROWS?ecoConvert():null;
+  var dates=ECO_CONVERTED&&ECO_CONVERTED.length?Array.from(new Set(ECO_CONVERTED.map(function(r){return getOpDate(r.ts);}))).sort():[];
+  var srcCount={}; if(ECO_ROWS) ECO_ROWS.forEach(function(r){ srcCount[r.src]=(srcCount[r.src]||0)+1; });
+  var html='';
+  html+='<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap">';
+  html+='<h2 style="margin:0;font-size:18px;font-weight:700;color:#0f172a;letter-spacing:-0.02em">🔄 EcoSmart import</h2>';
+  html+='<span style="color:#64748b;font-size:12px">Lees de export van de EcoSmart-app in (.xlsx) en laad \'m in het dashboard.</span></div>';
+
+  html+='<div class="rep-section"><div class="rep-body" style="padding:18px">';
+  html+='<label style="font-size:13px;font-weight:500;color:#0f172a;display:block;margin-bottom:10px">EcoSmart-bestand (.xlsx of .csv):</label>';
+  html+='<input type="file" id="eco-file" accept=".xlsx,.xls,.csv" style="font-size:12px">';
+  html+='</div></div>';
+
+  if(stats){
+    var pctM=stats.total?Math.round(stats.matched/(stats.matched+stats.unmatched||1)*100):0;
+    html+='<div class="rep-section"><div class="rep-body" style="background:#fafbfc">';
+    html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
+    function tile(v,l,col){ return '<div style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 0 0 1px rgba(15,23,42,.05)"><div style="font-size:26px;font-weight:700;letter-spacing:-0.03em;color:'+(col||'#0f172a')+'">'+v+'</div><div style="font-size:10.5px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-top:4px">'+l+'</div></div>'; }
+    html+=tile(stats.total,'Regels in export');
+    html+=tile(stats.matched,'Gekoppeld aan winkel','#16a34a');
+    html+=tile(stats.unmatched,'Niet gekoppeld', stats.unmatched?'#dc2626':'#94a3b8');
+    html+=tile(stats.excl,'Lift (uitgesloten)','#94a3b8');
+    html+='</div>';
+    html+='<div style="margin-top:12px;font-size:12px;color:#64748b">Periode: '+(dates.length?dates[0]+' t/m '+dates[dates.length-1]:'—')+' · Bron: '+Object.keys(srcCount).map(function(k){return k+' '+srcCount[k];}).join(', ')+'</div>';
+    html+='</div></div>';
+
+    // Load button
+    html+='<div style="display:flex;gap:10px;margin:4px 0 14px"><button type="button" onclick="ecoLoadIntoDashboard()" class="rep-btn primary" style="font-size:13px">⬇ Laad in dashboard ('+ (ECO_CONVERTED?ECO_CONVERTED.length:0) +' scans)</button></div>';
+
+    // Unmatched table
+    var um=stats.unmatchedList, umKeys=Object.keys(um).sort(function(a,b){return um[b]-um[a];});
+    if(umKeys.length){
+      html+='<div class="rep-section"><div class="rep-sh"><h3>⚠ Niet gekoppelde locaties</h3><span style="font-size:11px;color:#94a3b8">'+umKeys.length+' locaties · pas eventueel de routelijst of alias aan</span></div>';
+      html+='<div class="rep-body" style="padding:0"><table class="rep-table" style="margin:0"><thead><tr><th style="padding:10px 12px">Location | Sub-Location</th><th style="padding:10px 12px;text-align:right">Aantal</th></tr></thead><tbody>';
+      umKeys.forEach(function(k){ html+='<tr><td style="font-weight:500">'+k+'</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:#dc2626;font-weight:600">'+um[k]+'</td></tr>'; });
+      html+='</tbody></table></div></div>';
+    }
+
+    // === Gescande winkels overzicht ===
+    if(ECO_CONVERTED && ECO_CONVERTED.length){
+      var byShop={};
+      ECO_CONVERTED.forEach(function(r){
+        var key=r.shop||'(onbekend)';
+        if(!byShop[key]) byShop[key]={shop:key, pin:r.pin, count:0, days:{}, last:0};
+        var e=byShop[key]; e.count++; e.days[getOpDate(r.ts)]=1; if(r.ts>e.last)e.last=r.ts;
+      });
+      var shopRows=Object.keys(byShop).map(function(k){return byShop[k];}).sort(function(a,b){return b.count-a.count;});
+      var uniqShops=shopRows.length;
+      html+='<div class="rep-section"><div class="rep-sh"><h3>🏪 Gescande winkels</h3><span style="font-size:11px;color:#94a3b8">'+uniqShops+' unieke winkels · gesorteerd op aantal scans</span></div>';
+      html+='<div class="rep-body" style="padding:0"><div style="max-height:520px;overflow-y:auto;border-radius:0 0 14px 14px">';
+      html+='<table class="rep-table" style="margin:0"><thead style="position:sticky;top:0;background:#fff;z-index:2;box-shadow:0 1px 0 #eef2f7"><tr>';
+      html+='<th style="padding:11px 12px">Route</th><th style="padding:11px 12px">Winkel</th><th style="padding:11px 12px;text-align:right">Scans</th><th style="padding:11px 12px;text-align:right">Dagen</th><th style="padding:11px 12px;text-align:right">Laatste scan</th></tr></thead><tbody>';
+      shopRows.forEach(function(r){
+        var st=(typeof getRouteStyle==='function')?getRouteStyle(r.pin):{name:r.pin,color:'#64748b'};
+        var isUnmatched=(r.pin==='0000');
+        var dagen=Object.keys(r.days).length;
+        var last=r.last?(new Date(r.last)).toLocaleString('nl-NL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+        html+='<tr'+(isUnmatched?' style="background:#fef2f2"':'')+'>';
+        html+='<td style="white-space:nowrap"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(isUnmatched?'#dc2626':st.color)+';margin-right:8px;vertical-align:middle"></span><span style="font-size:11px;color:#64748b">'+(isUnmatched?'niet gekoppeld':st.name)+'</span></td>';
+        html+='<td style="font-weight:500">'+r.shop+'</td>';
+        html+='<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">'+r.count+'</td>';
+        html+='<td style="text-align:right;font-variant-numeric:tabular-nums;color:#64748b">'+dagen+'</td>';
+        html+='<td style="text-align:right;font-variant-numeric:tabular-nums;color:#94a3b8;font-size:11px">'+last+'</td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table></div></div></div>';
+    }
+  } else {
+    html+='<div class="rep-body" style="text-align:center;padding:50px 20px;color:#94a3b8;font-size:13px"><div style="font-size:44px;margin-bottom:12px">📥</div>Nog geen EcoSmart-bestand ingelezen.<br>Kies hierboven het .xlsx-bestand uit de EcoSmart-app.</div>';
+  }
+
+  root.innerHTML=html;
+  var fi=document.getElementById('eco-file');
+  if(fi) fi.addEventListener('change',function(e){ var f=e.target.files[0]; if(f) ecoHandleFile(f); });
+}
+
+function ecoLoadIntoDashboard(){
+  if(!ECO_CONVERTED||!ECO_CONVERTED.length){ alert('Geen data om te laden.'); return; }
+  AD=ECO_CONVERTED.slice().filter(function(r){ return !isLiftScan(r.shop); });
+  if(typeof reassignPinsByShopName==='function') reassignPinsByShopName(AD);
+  var dates=Array.from(new Set(AD.map(function(r){return getOpDate(r.ts);}))).sort();
+  var dfEl=document.getElementById('df'); if(dfEl&&dates.length) dfEl.value=dates[dates.length-1];
+  // update source label
+  var lu=document.getElementById('lu'); if(lu) lu.textContent='EcoSmart import — '+AD.length+' scans';
+  var sub=document.querySelector('#topbar .sub'); if(sub) sub.textContent=AD.length+' scans geladen · EcoSmart export';
+  if(typeof render==='function') render();
+  if(typeof buildRouteFilter==='function') buildRouteFilter();
+  if(typeof getMonthOptions==='function') getMonthOptions();
+  if(typeof renderSample==='function' && document.getElementById('sample-view').style.display!=='none') renderSample();
+  switchView('live');
+}
+
+</script>
+</body>
+</html>
