@@ -84,7 +84,7 @@
       <input class="search" id="ds-q" placeholder="Zoek op naam of voorman" style="margin-left:0">
     </div>
     <div class="card tbl"><table>
-      <thead><tr><th>Datum</th><th>Dienst</th><th>Route</th><th>Medewerker</th><th>Doel</th><th>Gehaald</th><th>Score</th><th>Reden niet gehaald</th><th>Opmerking</th><th>Voorman</th><th>Kantoor</th></tr></thead>
+      <thead><tr><th>Datum</th><th>Dienst</th><th>Route</th><th>Medewerker</th><th>Doel</th><th>Gehaald</th><th>Score</th><th>Reden niet gehaald</th><th>Ingeleverd</th><th>Opmerking</th><th>Voorman</th><th>Kantoor</th></tr></thead>
       <tbody id="ds-rows"></tbody>
     </table><div class="empty" id="ds-empty" style="display:none">Nog geen dienstrapporten. Vul er na elke dienst één in per route.</div></div>
   </div>
@@ -152,6 +152,7 @@
         <label>Voorman <input id="s-voorman" list="voormannen"></label>
       </div>
       <div class="hint" id="s-scaninfo"></div>
+      <div><div style="font-size:12.5px;color:var(--muted);margin-bottom:4px">Ingeleverd aan het einde van de dienst</div><div id="s-spullen" style="display:flex;gap:12px;flex-wrap:wrap"></div></div>
       <label>Opmerking (welke locaties, wat is er gebeurd) <input id="s-opm" placeholder="bijv. Lounge 2: lift D-pier defect, 4 winkels gemist"></label>
       <div class="hint">Vul dit aan het einde van elke dienst in, één rapport per route. Het doel wordt vooringevuld vanuit de scandoelen.</div>
     </div>
