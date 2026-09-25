@@ -262,6 +262,13 @@ function dayNav(id, onchange){
 }
 
 /* ============ DIENSTRAPPORT ============ */
+const SPULLEN = [["sleutel","Sleutels"],["telefoon","Telefoon"],["scanner","Handscanner"],["scooter","Scooter aan lader"],["pas","Schipholpas gezien"]];
+function spullenCell(r){
+  if (r.ingeleverd === undefined || r.ingeleverd === null) return "";
+  const set = new Set(String(r.ingeleverd||"").split(",").filter(Boolean));
+  const ok = SPULLEN.filter(([k]) => set.has(k)).length;
+  return `<span class="st ${ok===SPULLEN.length?"green":ok?"amber":"red"}" title="${SPULLEN.map(([k,l])=>(set.has(k)?"\u2713 ":"\u2717 ")+l).join("\n")}"><i></i>${ok}/${SPULLEN.length}</span>${ok<SPULLEN.length?`<div class="sub">niet: ${SPULLEN.filter(([k])=>!set.has(k)).map(([,l])=>l.toLowerCase()).join(", ")}</div>`:""}`;
+}
 let dsFilter = "alle", dsRoute = "", dsMaand = "alle", dsQ = "", dsMode = "dag";
 function doelVoor(route, dienst){
   const row = (DATA.doelen||[]).find(x => x.route === route);
@@ -309,7 +316,7 @@ function renderDs(){
   document.getElementById("ds-rows").innerHTML = rows.map(r=>`<tr style="cursor:default">
     <td class="num">${fmt(r.datum)}</td><td><span class="dienst ${(r.dienst||"").toLowerCase()}">${r.dienst||"–"}</span></td><td>${r.route||""}</td><td class="name">${r.medewerker||""}</td>
     <td class="num">${r.doel||""}</td><td class="num">${r.gehaald}${r.laatste_scan?`<span class="sub">${r.eerste_scan||"?"} – ${r.laatste_scan}</span>`:""}</td><td>${r.pct===null?"–":`<span class="pct ${pctClass(r.pct)}">${r.pct}%</span>`}${(() => { const st = scanStats(r.datum, r.dienst, r.route); return st && (st.done !== r.gehaald || st.expected !== r.doel) ? `<div><span class="st amber" style="padding:1px 7px;font-size:11px" title="De scans zijn veranderd sinds dit rapport is gemaakt"><i></i>scans nu ${st.done}/${st.expected}</span> <button class="lnk ds-sync" data-k="${dsKey(r)}">bijwerken</button></div>` : ""; })()}</td>
-    <td style="white-space:normal;max-width:240px">${r.status==="Te bevestigen"?`<span class="st amber"><i></i>Te bevestigen</span> `:""}${r.reden||""}${r.gemist?`<details><summary style="font-size:12px;color:var(--blue);cursor:pointer">Niet gescand (${r.gemist.split("|").length})</summary><div class="shops">${r.gemist.split("|").map(g=>`<span class="shop">${g}</span>`).join("")}</div></details>`:""}</td><td style="white-space:normal;max-width:220px;color:var(--muted);font-size:12.5px">${r.opmerking||""}</td><td>${r.voorman||""}${r.status==="Te bevestigen"?` <button class="lnk ds-confirm" data-k="${dsKey(r)}">bevestigen</button>`:""}</td>
+    <td style="white-space:normal;max-width:240px">${r.status==="Te bevestigen"?`<span class="st amber"><i></i>Te bevestigen</span> `:""}${r.reden||""}${r.gemist?`<details><summary style="font-size:12px;color:var(--blue);cursor:pointer">Niet gescand (${r.gemist.split("|").length})</summary><div class="shops">${r.gemist.split("|").map(g=>`<span class="shop">${g}</span>`).join("")}</div></details>`:""}</td><td style="white-space:normal">${spullenCell(r)}</td><td style="white-space:normal;max-width:220px;color:var(--muted);font-size:12.5px">${r.opmerking||""}</td><td>${r.voorman||""}${r.status==="Te bevestigen"?` <button class="lnk ds-confirm" data-k="${dsKey(r)}">bevestigen</button>`:""}</td>
     <td style="white-space:normal;max-width:240px;font-size:12.5px">${kcCell(r)}</td></tr>`).join("");
   document.querySelectorAll("#ds-rows .kc-open").forEach(b => b.onclick = e => { e.stopPropagation(); openKc(b.dataset.k); });
   document.querySelectorAll("#ds-rows .ds-confirm").forEach(b => b.onclick = e => { e.stopPropagation(); openDsEdit(b.dataset.k); });
@@ -349,10 +356,16 @@ function openDsEdit(key){
   dsEditRow = r;
   document.getElementById("s-datum").value = r.datum; document.getElementById("s-dienst").value = r.dienst; document.getElementById("s-route").value = r.route;
   document.getElementById("s-naam").value = r.medewerker||""; document.getElementById("s-doel").value = r.doel||""; document.getElementById("s-gehaald").value = r.gehaald||""; document.getElementById("s-reden").value = r.reden||""; document.getElementById("s-opm").value = r.opmerking||"";
+  renderSpullen(r.ingeleverd);
   document.getElementById("s-scaninfo").innerHTML = r.gemist ? `Niet gescand volgens EcoSmart: <div class="shops">${r.gemist.split("|").map(g=>`<span class="shop">${g}</span>`).join("")}</div>` : "";
 }
+function renderSpullen(val){
+  const set = new Set(String(val||"").split(",").filter(Boolean));
+  document.getElementById("s-spullen").innerHTML = SPULLEN.map(([k,l]) => `<label class="hint" style="display:flex;align-items:center;gap:5px;color:var(--ink)"><input type="checkbox" data-s="${k}" ${set.has(k)?"checked":""}>${l}</label>`).join("");
+}
+function spullenValue(){ return [...document.querySelectorAll("#s-spullen input:checked")].map(i=>i.dataset.s).join(","); }
 document.getElementById("dsBtn").onclick = () => {
-  dsEditRow = null;
+  dsEditRow = null; renderSpullen("");
   const rs = document.getElementById("s-route"); rs.innerHTML = CONFIG.routes.map(r=>`<option>${r}</option>`).join("");
   const fill = () => {
     const st = scanStats(document.getElementById("s-datum").value, document.getElementById("s-dienst").value, rs.value);
@@ -503,7 +516,7 @@ const TABLES = {
   vca: ["naam","status","datum","diploma"],
   toolboxen: ["naam","toolbox","deadline","afgerond"],
   incidenten: ["datum","dienst","naam","incident","tijd","waarschuwing","voorman","opmerking"],
-  dienstrapport: ["datum","dienst","route","medewerker","doel","gehaald","gemist","eerste_scan","laatste_scan","reden","opmerking","voorman","kantoor","actie","wie","status","gecontroleerd_door","gecontroleerd_op","afgerond_door","afgerond_op"],
+  dienstrapport: ["datum","dienst","route","medewerker","doel","gehaald","gemist","eerste_scan","laatste_scan","ingeleverd","reden","opmerking","voorman","kantoor","actie","wie","status","gecontroleerd_door","gecontroleerd_op","afgerond_door","afgerond_op"],
   doelen: ["route","ochtend","middag","nacht"],
   scans: ["ts","shop","pin","note","op_date","dienst"],
   mail_ontvangers: ["email","naam","dagrapport","onder_norm","aanspreekpunt","shiftrapport","actief"],
@@ -626,7 +639,7 @@ document.getElementById("m-save").onclick = async () => {
       ["n-naam","n-voorman","n-toolbox"].forEach(id=>document.getElementById(id).value="");
       toast(res.demo ? `${m.naam} toegevoegd (demo: niet opgeslagen, geen sheet gekoppeld)` : `${m.naam} toegevoegd aan de sheet`);
     } else if (mode === "ds") {
-      const row = {...(dsEditRow||{}), datum:v("s-datum"), dienst:v("s-dienst"), route:v("s-route"), medewerker:v("s-naam"), doel:v("s-doel"), gehaald:v("s-gehaald"), reden:v("s-reden"), opmerking:v("s-opm"), voorman:v("s-voorman")||who(), status: (dsEditRow && dsEditRow.status==="Te bevestigen") ? "Bevestigd" : (dsEditRow ? dsEditRow.status : "Bevestigd")};
+      const row = {...(dsEditRow||{}), datum:v("s-datum"), dienst:v("s-dienst"), route:v("s-route"), medewerker:v("s-naam"), doel:v("s-doel"), gehaald:v("s-gehaald"), reden:v("s-reden"), opmerking:v("s-opm"), ingeleverd: spullenValue(), voorman:v("s-voorman")||who(), status: (dsEditRow && dsEditRow.status==="Te bevestigen") ? "Bevestigd" : (dsEditRow ? dsEditRow.status : "Bevestigd")};
       const st = scanStats(row.datum, row.dienst, row.route); if (st) { if (!row.gemist) row.gemist = st.missed.join("|"); row.eerste_scan = st.firstStr; row.laatste_scan = st.lastStr; }
       if (!row.datum || !row.route || row.gehaald==="") return toast("Datum, route en aantal gehaald zijn verplicht.");
       if (+row.doel && +row.gehaald < +row.doel && !row.reden) return toast("Geef een reden op waarom het doel niet is gehaald.");
