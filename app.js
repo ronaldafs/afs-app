@@ -732,8 +732,8 @@ const ROUTE_PIN = { L1:"1118", L2:"2228", L3:"3338", Plaza:"4448", KLM:"6668" };
 function xlsxDateStr(dt){ const p = n => String(n).padStart(2,"0"); return `${dt.getUTCFullYear()}-${p(dt.getUTCMonth()+1)}-${p(dt.getUTCDate())} ${p(dt.getUTCHours())}:${p(dt.getUTCMinutes())}:${p(dt.getUTCSeconds())}`; }
 // UTC-tijd uit de export omzetten naar Nederlandse tijd (zomer +2, winter +1)
 function utcToNl(t){ const parts = new Intl.DateTimeFormat("nl-NL",{timeZone:"Europe/Amsterdam",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).formatToParts(new Date(t.getTime() - t.getTimezoneOffset()*60000)); const g = k => +parts.find(p=>p.type===k).value; return new Date(g("year"), g("month")-1, g("day"), g("hour")%24, g("minute"), g("second")); }
-function shiftOf(ts){ const m = ts.getHours()*60 + ts.getMinutes(); return m >= 405 && m < 885 ? "ochtend" : m >= 885 && m < 1365 ? "middag" : "nacht"; }
-function opDateOf(ts){ const m = ts.getHours()*60 + ts.getMinutes(); const x = new Date(ts); if (m < 405) x.setDate(x.getDate()-1); return iso(x); }
+function shiftOf(ts){ const m = ts.getHours()*60 + ts.getMinutes(); return m >= 420 && m < 885 ? "ochtend" : m >= 885 && m < 1365 ? "middag" : "nacht"; }   // Renewi: dag 07:00-14:45, avond 14:45-22:45, nacht 22:45-07:00
+function opDateOf(ts){ const m = ts.getHours()*60 + ts.getMinutes(); const x = new Date(ts); if (m < 420) x.setDate(x.getDate()-1); return iso(x); }   // nacht voor 07:00 hoort bij de vorige dag
 function planCol(routeName, shiftKey){ if (routeName === "Nacht" || shiftKey === "nacht") return "Nachtdienst"; const base = routeName.replace(/ (dag|avond)$/,""); return `${base} - ${shiftKey === "middag" ? "Avond" : "Dag"}`; }
 function routeNameFor(routeKey, shiftKey){ if (shiftKey === "nacht") return "Nacht"; const n = ROUTE_NL[routeKey]; return n ? n + (shiftKey === "middag" ? " avond" : " dag") : null; }
 function mapRaw(loc, sub){ const m = RENEWI_MAPPING[`${loc}|${sub}`.trim().toLowerCase()]; return m ? { vn: m.vn, route: m.route } : null; }
@@ -754,7 +754,7 @@ function scanStats(date, dienst, routeName){
   if (!all.length && !scansFor(date, null).length) return null;
   const routeKey = shiftKey === "nacht" ? null : Object.keys(ROUTE_NL).find(k => routeName.startsWith(ROUTE_NL[k]));
   // Welke scans horen bij deze route/dienst: voor dag/avond de scans van winkels op deze route, voor nacht alle scans in het nachtvenster
-  const mine = all.filter(s => shiftKey === "nacht" ? true : (RENEWI_MAPPING_BY_VN[s.shop]||{}).route === routeKey);
+  const mine = all.filter(s => shiftKey === "nacht" ? shops.includes(s.shop) : (RENEWI_MAPPING_BY_VN[s.shop]||{}).route === routeKey);   // nacht: alleen winkels met nachtplanning (Renewi)
   const uniq = uniqueVisits(mine);
   const cnt = {}; uniq.forEach(s => { cnt[s.shop] = (cnt[s.shop]||0) + 1; });
   let expected = 0, done = 0, extra = 0; const missed = [], doneList = [], perShop = [];
