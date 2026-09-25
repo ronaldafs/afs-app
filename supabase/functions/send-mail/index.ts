@@ -21,6 +21,8 @@ const fmt = (s?: string | null) => s ? new Date(s).toLocaleDateString("nl-NL", {
 const pct = (r: any) => { const d = +r.doel || 0, g = +r.gehaald || 0; return d ? Math.round(g / d * 100) : null; };
 const esc = (s: any) => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
 const chip = (t: string, bg: string, c: string) => `<span style="display:inline-block;font-size:12px;padding:2px 9px;border-radius:999px;background:${bg};color:${c};margin:2px 4px 2px 0">${esc(t)}</span>`;
+const SPULLEN: [string, string][] = [["sleutel","Sleutels"],["telefoon","Telefoon"],["scanner","Handscanner"],["scooter","Scooter aan lader"],["pas","Schipholpas gezien"]];
+const spullen = (r: any) => { const set = new Set(String(r.ingeleverd || "").split(",").filter(Boolean)); const miss = SPULLEN.filter(([k]) => !set.has(k)).map(([, l]) => l); return miss.length ? chip("Niet ingeleverd: " + miss.join(", "), "#FBE7E7", "#C62828") : chip("Alles ingeleverd", "#E6F4EC", "#1F8A5B"); };
 const scoreChip = (p: number | null) => p === null ? "–" : chip(p + "%", p >= TARGET ? "#E6F4EC" : p >= TARGET - 10 ? "#FBF1DC" : "#FBE7E7", p >= TARGET ? "#1F8A5B" : p >= TARGET - 10 ? "#B7791F" : "#C62828");
 
 const SHIFT_ROUTES: Record<string, string[]> = { Ochtend: ["Lounge 1 dag","Lounge 2 dag","Lounge 3 dag","Plaza dag","KLM dag"], Middag: ["Lounge 1 avond","Lounge 2 avond","Lounge 3 avond","Plaza avond","KLM avond"], Nacht: ["Nacht"] };
@@ -48,6 +50,7 @@ function rapportHtml(r: any) {
     <tr><td style="padding:6px 0;color:#6B7280">Gescand</td><td style="padding:6px 0">${esc(r.gehaald)} van ${esc(r.doel)} ${scoreChip(p)}${r.laatste_scan ? ` <span style="color:#6B7280">· ${esc(r.eerste_scan || "?")} – ${esc(r.laatste_scan)}</span>` : ""}</td></tr>
     ${gemist.length ? `<tr><td style="padding:6px 0;color:#6B7280;vertical-align:top">Niet gescand</td><td style="padding:6px 0">${gemist.map(g => chip(g, "#FBE7E7", "#C62828")).join("")}</td></tr>` : ""}
     <tr><td style="padding:6px 0;color:#6B7280">Reden</td><td style="padding:6px 0">${esc(r.reden || "–")}</td></tr>
+    ${r.ingeleverd !== undefined && r.ingeleverd !== null ? `<tr><td style="padding:6px 0;color:#6B7280">Ingeleverd</td><td style="padding:6px 0">${spullen(r)}</td></tr>` : ""}
     ${r.opmerking ? `<tr><td style="padding:6px 0;color:#6B7280">Opmerking voorman</td><td style="padding:6px 0">${esc(r.opmerking)}</td></tr>` : ""}
     <tr><td style="padding:6px 0;color:#6B7280">Voorman</td><td style="padding:6px 0">${esc(r.voorman || "–")}</td></tr>
     ${r.kantoor ? `<tr><td style="padding:6px 0;color:#6B7280;vertical-align:top">Kantoor</td><td style="padding:6px 0">${esc(r.kantoor)}${r.actie ? `<br><b style="color:#C62828">Actie: ${esc(r.actie)}${r.wie ? " · " + esc(r.wie) : ""}</b>` : ""}</td></tr>` : ""}
@@ -67,7 +70,7 @@ async function shiftrapport(datum: string, dienst: string) {
   const onder = rs.filter(r => pct(r) !== null && pct(r)! < TARGET);
   const html = `<h2 style="margin:0 0 4px;font-size:20px">${esc(dienst)}dienst ${fmt(datum)} afgerond</h2>
     <p style="margin:0 0 18px;color:#6B7280">Alle routes zijn bevestigd door de voorman. Scans: <b style="color:#17203A">${gehaald} van ${doel}</b> bezoeken ${scoreChip(total)}</p>
-    <table style="border-collapse:collapse;width:100%;font-size:13px">${rs.sort((a, b) => a.route.localeCompare(b.route)).map(r => `<tr style="border-bottom:1px solid #E4E8EF"><td style="padding:6px 8px 6px 0"><b>${esc(r.route)}</b></td><td style="padding:6px 8px 6px 0">${esc(r.medewerker || "–")}</td><td style="padding:6px 8px 6px 0">${esc(r.gehaald)}/${esc(r.doel)}</td><td style="padding:6px 0">${scoreChip(pct(r))}</td><td style="padding:6px 0;color:#6B7280">${esc(r.reden || "")}${r.opmerking ? " · " + esc(r.opmerking) : ""}</td><td style="padding:6px 0;color:#6B7280">${esc(r.voorman || "")}</td></tr>`).join("")}</table>
+    <table style="border-collapse:collapse;width:100%;font-size:13px">${rs.sort((a, b) => a.route.localeCompare(b.route)).map(r => `<tr style="border-bottom:1px solid #E4E8EF"><td style="padding:6px 8px 6px 0"><b>${esc(r.route)}</b></td><td style="padding:6px 8px 6px 0">${esc(r.medewerker || "–")}</td><td style="padding:6px 8px 6px 0">${esc(r.gehaald)}/${esc(r.doel)}</td><td style="padding:6px 0">${scoreChip(pct(r))}</td><td style="padding:6px 0;color:#6B7280">${esc(r.reden || "")}${r.opmerking ? " · " + esc(r.opmerking) : ""}</td><td style="padding:6px 0">${r.ingeleverd !== undefined && r.ingeleverd !== null ? spullen(r) : ""}</td><td style="padding:6px 0;color:#6B7280">${esc(r.voorman || "")}</td></tr>`).join("")}</table>
     ${onder.length ? `<h3 style="font-size:14px;margin:18px 0 8px;color:#C62828">Onder de norm (${onder.length})</h3>${onder.map(rapportHtml).join('<hr style="border:0;border-top:1px solid #E4E8EF;margin:10px 0">')}` : ""}`;
   return send(await recipients("shiftrapport"), `${dienst}dienst ${fmt(datum)} · ${total === null ? "" : total + "% gescand"} · alle routes bevestigd`, html);
 }
