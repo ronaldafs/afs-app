@@ -722,56 +722,73 @@ document.getElementById("exportBtn").onclick = () => {
 
 document.getElementById("q").oninput = e => { query = e.target.value; render(); };
 
-/* ============ SCANS (EcoSmart) ============ */
+/* ============ SCANS (EcoSmart, volgens Renewi-model) ============ */
 const SHIFT_NL = { ochtend:"Ochtend", middag:"Middag", nacht:"Nacht" };
 const SHIFT_KEY = { "Ochtend":"ochtend", "Middag":"middag", "Nacht":"nacht" };
-function routeNameFor(pin, shift){ const n = CONFIG.routePins[pin]; if (!n) return null; if (pin === "5558") return shift === "nacht" ? "Nacht" : null; return shift === "ochtend" ? n + " dag" : shift === "middag" ? n + " avond" : null; }
-function pinFor(routeName){ for (const pin in CONFIG.routePins) { const n = CONFIG.routePins[pin]; if (routeName === "Nacht" && pin === "5558") return pin; if (routeName === n + " dag" || routeName === n + " avond") return pin; } return null; }
+const ROUTE_NL = { L1:"Lounge 1", L2:"Lounge 2", L3:"Lounge 3", Plaza:"Plaza", KLM:"KLM" };
+const ROUTE_PIN = { L1:"1118", L2:"2228", L3:"3338", Plaza:"4448", KLM:"6668" };
+// Diensten volgens Renewi: dag 06:45–14:45, avond 14:45–22:45, nacht 22:45–06:45 (nacht vóór 06:45 hoort bij de vorige dag)
+// Excel-datum (door SheetJS als UTC-Date gegeven) naar "YYYY-MM-DD HH:MM:SS" zonder tijdzoneverschuiving
+function xlsxDateStr(dt){ const p = n => String(n).padStart(2,"0"); return `${dt.getUTCFullYear()}-${p(dt.getUTCMonth()+1)}-${p(dt.getUTCDate())} ${p(dt.getUTCHours())}:${p(dt.getUTCMinutes())}:${p(dt.getUTCSeconds())}`; }
+// UTC-tijd uit de export omzetten naar Nederlandse tijd (zomer +2, winter +1)
+function utcToNl(t){ const parts = new Intl.DateTimeFormat("nl-NL",{timeZone:"Europe/Amsterdam",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).formatToParts(new Date(t.getTime() - t.getTimezoneOffset()*60000)); const g = k => +parts.find(p=>p.type===k).value; return new Date(g("year"), g("month")-1, g("day"), g("hour")%24, g("minute"), g("second")); }
+function shiftOf(ts){ const m = ts.getHours()*60 + ts.getMinutes(); return m >= 405 && m < 885 ? "ochtend" : m >= 885 && m < 1365 ? "middag" : "nacht"; }
+function opDateOf(ts){ const m = ts.getHours()*60 + ts.getMinutes(); const x = new Date(ts); if (m < 405) x.setDate(x.getDate()-1); return iso(x); }
+function planCol(routeName, shiftKey){ if (routeName === "Nacht" || shiftKey === "nacht") return "Nachtdienst"; const base = routeName.replace(/ (dag|avond)$/,""); return `${base} - ${shiftKey === "middag" ? "Avond" : "Dag"}`; }
+function routeNameFor(routeKey, shiftKey){ if (shiftKey === "nacht") return "Nacht"; const n = ROUTE_NL[routeKey]; return n ? n + (shiftKey === "middag" ? " avond" : " dag") : null; }
+function mapRaw(loc, sub){ const m = RENEWI_MAPPING[`${loc}|${sub}`.trim().toLowerCase()]; return m ? { vn: m.vn, route: m.route } : null; }
 function scansFor(date, shiftKey){ return (DATA.scans||[]).filter(s => s.op_date === date && (!shiftKey || s.dienst === shiftKey)); }
-function rondeOf(ts){
-  const m = ts.getHours()*60 + ts.getMinutes();
-  for (const r of RONDEN) { if (r.id === 7 && (m >= 22*60+45 || m < r.end)) return r.id; if (m >= r.start && m < r.end) return r.id; }
-  let best = null, bd = 99; for (const r of RONDEN) { const dd = Math.min(Math.abs(m - r.start), Math.abs(m - r.end)); if (dd < bd) { bd = dd; best = r.id; } }
-  return bd <= 20 ? best : null;   // scan net buiten het venster telt voor de dichtstbijzijnde ronde (max 20 min)
+// Unieke bezoeken per winkel: een registratie binnen 30 minuten na de vorige getelde registratie telt niet (Renewi-regel "Uniek")
+function uniqueVisits(list){
+  const out = []; const last = {};
+  list.slice().sort((x,y)=>x.ts-y.ts).forEach(s => { const k = s.shop; if (last[k] && (s.ts - last[k]) < 30*60000) return; last[k] = s.ts; out.push(s); });
+  return out;
 }
-// Per winkel moeten meerdere rondes worden gelopen (w.r = ronde-nummers). Elk bezoek telt apart.
 function scanStats(date, dienst, routeName){
-  const pin = pinFor(routeName); if (!pin || !date) return null;
-  const shiftKey = SHIFT_KEY[dienst] || (routeName.endsWith("avond") ? "middag" : routeName === "Nacht" ? "nacht" : "ochtend");
-  const def = getRouteDef(pin, shiftKey); if (!def || !def.winkels) return null;
-  const sc = scansFor(date, shiftKey).filter(s => s.pin === pin);
-  if (!sc.length && !scansFor(date, null).length) return null;
-  let expected = 0, done = 0; const missed = [], doneList = [];
-  def.winkels.forEach(w => {
-    const rondes = (w.r && w.r.length) ? [...new Set(w.r)] : [null];
-    const gemist = [];
-    rondes.forEach(rid => { expected++; const hit = sc.some(s => matches(s.shop, w.n) && !isLiftScan(s.shop) && (rid === null || rondeOf(s.ts) === rid)); if (hit) done++; else gemist.push(rid); });
-    if (gemist.length) missed.push(w.n + (gemist[0] === null ? "" : " (ronde " + gemist.join(", ") + ")")); else doneList.push(w.n);
-  });
-  const times = sc.map(s => s.ts).sort((x,y)=>x-y);
+  if (!date || !routeName) return null;
+  const shiftKey = SHIFT_KEY[dienst] || (routeName === "Nacht" ? "nacht" : routeName.endsWith("avond") ? "middag" : "ochtend");
+  const col = planCol(routeName, shiftKey);
+  const shops = Object.keys(RENEWI_PLAN).filter(vn => (RENEWI_PLAN[vn][col]||0) > 0);
+  if (!shops.length) return null;
+  const all = scansFor(date, shiftKey);
+  if (!all.length && !scansFor(date, null).length) return null;
+  const routeKey = shiftKey === "nacht" ? null : Object.keys(ROUTE_NL).find(k => routeName.startsWith(ROUTE_NL[k]));
+  // Welke scans horen bij deze route/dienst: voor dag/avond de scans van winkels op deze route, voor nacht alle scans in het nachtvenster
+  const mine = all.filter(s => shiftKey === "nacht" ? true : (RENEWI_MAPPING_BY_VN[s.shop]||{}).route === routeKey);
+  const uniq = uniqueVisits(mine);
+  const cnt = {}; uniq.forEach(s => { cnt[s.shop] = (cnt[s.shop]||0) + 1; });
+  let expected = 0, done = 0, extra = 0; const missed = [], doneList = [], perShop = [];
+  shops.forEach(vn => { const p = RENEWI_PLAN[vn][col], c = cnt[vn]||0; expected += p; done += c; if (c > p) extra += c - p; perShop.push({vn, plan:p, done:c}); if (c < p) missed.push(`${vn} (${c}/${p})`); else doneList.push(vn); });
+  // Scans bij winkels zonder plan voor deze dienst tellen ook mee (zoals bij Renewi)
+  Object.keys(cnt).forEach(vn => { if (!shops.includes(vn)) { done += cnt[vn]; extra += cnt[vn]; } });
+  const times = mine.map(s => s.ts).sort((x,y)=>x-y);
   const hhmm = t => t ? t.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"}) : "";
-  return { pin, expected, done, missed, doneList, scans: sc.length, winkels: def.winkels.length, winkelsMissed: missed.length, first: times[0]||null, last: times[times.length-1]||null, firstStr: hhmm(times[0]), lastStr: hhmm(times[times.length-1]) };
+  return { expected, done, extra, missed, doneList, perShop, scans: mine.length, winkels: shops.length, winkelsMissed: missed.length, first: times[0]||null, last: times[times.length-1]||null, firstStr: hhmm(times[0]), lastStr: hhmm(times[times.length-1]) };
 }
+const RENEWI_MAPPING_BY_VN = {}; Object.values(RENEWI_MAPPING).forEach(m => { RENEWI_MAPPING_BY_VN[m.vn] = m; });
+const ROUTE_SHIFTS = [["L1","ochtend"],["L2","ochtend"],["L3","ochtend"],["Plaza","ochtend"],["KLM","ochtend"],["L1","middag"],["L2","middag"],["L3","middag"],["Plaza","middag"],["KLM","middag"],[null,"nacht"]];
 function renderScans(){
   const dates = [...new Set((DATA.scans||[]).map(s=>s.op_date))].sort();
   dayNav("scan-day", renderScans);
   const dEl = document.getElementById("scan-date"); dEl.value = DAY;
   const date = DAY, shiftF = document.getElementById("scan-shift").value;
-  document.getElementById("scan-status").textContent = dates.length ? `${(DATA.scans||[]).length} scans geladen, ${fmt(dates[0])} t/m ${fmt(dates[dates.length-1])} (laatste ${CONFIG.scanDays} dagen).` : "Nog geen scans. Lees de EcoSmart-export in (xlsx of csv).";
+  const unk = (DATA.scans||[]).filter(s => s.op_date === date && s.shop.startsWith("?? "));
+  document.getElementById("scan-status").innerHTML = (dates.length ? `${(DATA.scans||[]).length} scans geladen, ${fmt(dates[0])} t/m ${fmt(dates[dates.length-1])}. Telling volgens het Renewi-model: gepland per winkel per dienst, registraties binnen 30 min tellen als één bezoek.` : "Nog geen scans. Lees de EcoSmart-export in (xlsx of csv).") + (unk.length ? ` <span style="color:var(--amber)">${unk.length} registraties bij onbekende winkels: ${[...new Set(unk.map(s=>s.note))].join(", ")}</span>` : "") + ` <label style="margin-left:8px"><input type="checkbox" id="scan-utc" ${localStorage.getItem("afs_scan_utc")!=="0"?"checked":""}> tijden in export zijn UTC (omrekenen naar Nederlandse tijd)</label>`;
+  document.getElementById("scan-utc").onchange = e => { localStorage.setItem("afs_scan_utc", e.target.checked ? "1" : "0"); toast("Instelling opgeslagen; lees de export opnieuw in."); };
   const rows = [];
-  for (const pin of ROUTE_ORDER) for (const sk of ["ochtend","middag","nacht"]) {
+  for (const [rk, sk] of ROUTE_SHIFTS) {
     if (shiftF && sk !== shiftF) continue;
-    const rn = routeNameFor(pin, sk); if (!rn) continue;
+    const rn = routeNameFor(rk, sk); if (!rn) continue;
     const st = scanStats(date, SHIFT_NL[sk], rn); if (!st) continue;
-    rows.push({ pin, sk, rn, ...st, dr: (DATA.dienstrapport||[]).find(r => r.datum===date && r.dienst===SHIFT_NL[sk] && r.route===rn) });
+    rows.push({ sk, rn, ...st, dr: (DATA.dienstrapport||[]).find(r => r.datum===date && r.dienst===SHIFT_NL[sk] && r.route===rn) });
   }
   const exp = rows.reduce((a,r)=>a+r.expected,0), done = rows.reduce((a,r)=>a+r.done,0);
-  const k = [["Bezoeken gescand", exp?Math.round(done/exp*100)+"%":"–", exp?({ok:"green",warn:"amber",bad:"red"})[pctClass(Math.round(done/exp*100))]:""], ["Bezoeken gescand / verwacht", `${done} / ${exp}`, "per winkel per ronde"], ["Bezoeken gemist", exp-done, exp-done?"red":""], ["Routes onder norm", rows.filter(r=>r.expected&&r.done/r.expected*100<CONFIG.scanTarget).length, ""], ["Scans deze dag", scansFor(date,null).length, ""]];
-  document.getElementById("scan-kpis").innerHTML = k.map(([l,v,c]) => `<div class="kpi ${c==="per winkel per ronde"?"":c}"><b>${v}</b><span>${l}${c==="per winkel per ronde"?" <span class=sub>(per winkel per ronde)</span>":""}</span></div>`).join("");
+  const k = [["Bezoeken gescand", exp?Math.round(done/exp*100)+"%":"–", exp?({ok:"green",warn:"amber",bad:"red"})[pctClass(Math.round(done/exp*100))]:""], ["Bezoeken gescand / verwacht", `${done} / ${exp}`, "gepland per winkel per dienst"], ["Bezoeken gemist", exp-done, exp-done?"red":""], ["Routes onder norm", rows.filter(r=>r.expected&&r.done/r.expected*100<CONFIG.scanTarget).length, ""], ["Scans deze dag", scansFor(date,null).length, ""]];
+  document.getElementById("scan-kpis").innerHTML = k.map(([l,v,c]) => `<div class="kpi ${c==="gepland per winkel per dienst"?"":c}"><b>${v}</b><span>${l}${c==="gepland per winkel per dienst"?" <span class=sub>(per winkel per ronde)</span>":""}</span></div>`).join("");
   document.getElementById("scan-body").innerHTML = rows.length ? rows.map(r => { const p = r.expected?Math.round(r.done/r.expected*100):0; return `
     <div class="scan-route"><div class="hd"><span class="dienst ${r.sk}">${SHIFT_NL[r.sk]}</span><h3>${r.rn}</h3><span class="prog"><span class="track"><span class="fill" style="width:${p}%;background:${p>=CONFIG.scanTarget?"var(--green)":p>=CONFIG.scanTarget-10?"var(--amber)":"var(--red)"}"></span></span><span class="num">${r.done}/${r.expected} bezoeken</span></span><span class="pct ${pctClass(p)}">${p}%</span>${r.lastStr?`<span class="sub">eerste scan ${r.firstStr} \u00b7 laatste scan ${r.lastStr}</span>`:""}
       <span class="spacer"></span>${r.dr ? `<span class="st ${r.dr.status==="Te bevestigen"?"amber":"green"}"><i></i>Dienstrapport: ${r.dr.status||"ingevuld"}${r.dr.medewerker?" · "+r.dr.medewerker:""}</span>` : `<span class="st grey"><i></i>Nog geen dienstrapport</span>`}</div>
-      ${r.missed.length ? `<details open><summary>${r.expected-r.done} bezoeken gemist bij ${r.missed.length} winkels</summary><div class="shops">${r.missed.map(m=>`<span class="shop">${m}</span>`).join("")}</div></details>` : `<div class="sub" style="margin-top:6px">Alle winkels gescand.</div>`}
+      ${r.missed.length ? `<details open><summary>${r.missed.length} winkels onder het geplande aantal bezoeken${r.extra?` · ${r.extra} extra bezoeken`:""}</summary><div class="shops">${r.missed.map(m=>`<span class="shop">${m}</span>`).join("")}</div></details>` : `<div class="sub" style="margin-top:6px">Alle geplande bezoeken gescand${r.extra?` · ${r.extra} extra`:""}.</div>`}
     </div>`; }).join("") : `<div class="empty">Geen scans voor ${fmt(date)}. Kies een andere datum of lees een export in.</div>`;
 }
 document.getElementById("scan-date").onchange = e => { DAY = e.target.value; renderScans(); };
@@ -780,16 +797,26 @@ document.getElementById("scan-file").onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   const st = document.getElementById("scan-status"); st.textContent = "Bestand lezen…";
   try {
-    let scans;
-    if (/\.xlsx?$/i.test(f.name)) { const wb = XLSX.read(await f.arrayBuffer(), {type:"array", cellDates:true}); const ws = wb.Sheets[wb.SheetNames[0]]; ECO_ROWS = ecoRowsFromMatrix(XLSX.utils.sheet_to_json(ws, {header:1, raw:false})); ecoConvert(); scans = ECO_CONVERTED; }
-    else { const txt = await f.text(); if (isEcoSmartText(txt)) { ECO_ROWS = ecoParseCSV(txt); ecoConvert(); scans = ECO_CONVERTED; } else scans = parse(txt); }
-    scans = (scans||[]).filter(s => s.pin !== "0000" && s.pin !== "9999");
-    reassignPinsByShopName(scans);
-    if (!scans.length) throw new Error("Geen scans herkend in dit bestand.");
-    const rows = scans.map(s => ({ ts: s.ts.toISOString(), shop: s.shop, pin: s.pin, note: s.note||"", op_date: getOpDate(s.ts), dienst: getShift(s.ts) }));
+    let eco;
+    if (/\.xlsx?$/i.test(f.name)) { const wb = XLSX.read(await f.arrayBuffer(), {type:"array", cellDates:true}); const ws = wb.Sheets[wb.SheetNames[0]]; eco = ecoRowsFromMatrix(XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:""}).map(row => row.map(c => c instanceof Date ? xlsxDateStr(c) : c))); }
+    else { const txt = await f.text(); if (!isEcoSmartText(txt)) throw new Error("Dit is geen EcoSmart-export (verwacht kolommen Visit Date, Location, Sub-Location)."); eco = ecoParseCSV(txt); }
+    if (!eco || !eco.length) throw new Error("Geen registraties gevonden in dit bestand.");
+    const utc = localStorage.getItem("afs_scan_utc") !== "0";   // EcoSmart exporteert in UTC; standaard omrekenen naar Nederlandse tijd
+    const unmapped = {}; const rows = [];
+    eco.forEach(r => {
+      const t0 = ecoParseDate(r.date); if (!t0) return; const ts = utc ? utcToNl(t0) : t0;
+      const m = mapRaw(r.loc, r.sub);
+      const shop = m ? m.vn : `?? ${r.loc} | ${r.sub}`; if (!m) unmapped[`${r.loc} | ${r.sub}`] = (unmapped[`${r.loc} | ${r.sub}`]||0)+1;
+      rows.push({ ts: ts.toISOString(), shop, pin: m ? (ROUTE_PIN[m.route]||"0000") : "0000", note: `${r.loc} | ${r.sub}`, op_date: opDateOf(ts), dienst: shiftOf(ts) });
+    });
+    if (!rows.length) throw new Error("Geen bruikbare registraties (datum niet herkend).");
+    // bestaande scans van deze dagen vervangen, zodat een nieuwere export nooit dubbel telt
+    const days = [...new Set(rows.map(r=>r.op_date))];
+    const del = await SB.from("scans").delete().in("op_date", days); if (del.error) throw del.error;
     for (let i = 0; i < rows.length; i += 500) { st.textContent = `Opslaan… ${Math.min(i+500, rows.length)}/${rows.length}`; const { error } = await SB.from("scans").upsert(rows.slice(i, i+500), { onConflict: "ts,shop,pin", ignoreDuplicates: true }); if (error) throw error; }
     const dates = [...new Set(rows.map(r=>r.op_date))].sort();
-    toast(`${rows.length} scans ingelezen (${fmt(dates[0])} t/m ${fmt(dates[dates.length-1])})`);
+    const un = Object.entries(unmapped); toast(`${rows.length} scans ingelezen (${fmt(dates[0])} t/m ${fmt(dates[dates.length-1])})${un.length?` · ${un.length} winkels onbekend`:""}`);
+    if (un.length) console.warn("Onbekende winkels (niet in Renewi-mapping):", un);
     await load();
     // bestaande dienstrapporten van deze dagen bijwerken met de nieuwe scancijfers (voorman-invoer blijft staan)
     let upd = 0;
@@ -802,8 +829,8 @@ document.getElementById("scan-file").onchange = async e => {
 document.getElementById("scan-gen").onclick = async () => {
   const date = document.getElementById("scan-date").value; if (!date) return;
   let n = 0, skipped = 0;
-  for (const pin of ROUTE_ORDER) for (const sk of ["ochtend","middag","nacht"]) {
-    const rn = routeNameFor(pin, sk); if (!rn) continue;
+  for (const [rk, sk] of ROUTE_SHIFTS) {
+    const rn = routeNameFor(rk, sk); if (!rn) continue;
     const st = scanStats(date, SHIFT_NL[sk], rn); if (!st) continue;
     const existing = (DATA.dienstrapport||{}) && (DATA.dienstrapport||[]).find(r => r.datum===date && r.dienst===SHIFT_NL[sk] && r.route===rn);
     if (existing && String(existing.doel)===String(st.expected) && String(existing.gehaald)===String(st.done) && (existing.gemist||"")===st.missed.join("|")) { skipped++; continue; }
